@@ -1,4 +1,5 @@
 import { createApp } from "vue";
+import './assets/css/design-system.css'
 import router from "./router/router";
 import App from "./App.vue";
 // 引入elementplus相关

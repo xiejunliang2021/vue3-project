@@ -10,11 +10,19 @@ const routes = [
   {
     path: "/login",
     name: "Login",
-    component: () => import("@/views/Login.vue"),
+    component: () => import("@/views/LoginView.vue"),
   },
   {
     path: "/home",
-    component: () => import("@/components/Home.vue"),
+    component: () => import("@/views/PortalView.vue"),
+  },
+  {
+    path: "/stock",
+    component: () => import("@/views/StockDashboard.vue"),
+  },
+  {
+    path: "/policy-details",
+    component: () => import("@/views/PolicyDetailsView.vue"),
   },
   {
     path: "/get_code_list",
@@ -31,6 +39,11 @@ const routes = [
   {
     path: "/favorites/vps",
     component: () => import("@/pages/VpsCollection.vue"),
+  },
+  {
+    path: "/backtest",
+    name: "Backtest",
+    component: () => import("@/views/BacktestView.vue"),
   },
 ];
 
