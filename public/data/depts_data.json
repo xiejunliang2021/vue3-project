@@ -1,0 +1,44 @@
+[
+  {
+    "name": "灵感部",
+    "desc": "把一闪而过的想法收进来，筛成可以拍、可以写、可以发布的内容种子",
+    "link": "obsidian://open?vault=obsidian&file=10%20Projects/01%20%E8%87%AA%E5%AA%92%E4%BD%93%E5%88%9B%E4%B8%9A/%E6%8A%96%E9%9F%B3%E5%88%9B%E4%BD%9C.md",
+    "real_path": "10 Projects/01 自媒体创业/抖音创作.md"
+  },
+  {
+    "name": "资料部",
+    "desc": "收藏可复用的教程、案例、剪藏、提示词和工具文档，需要时快速调取。 资料部是只读事实源。保存教程、案例、提示词、方法论、历史资料和参考文档，为设计部、项目部、任务部提供依据，不直接改动执行结果。",
+    "link": "obsidian://open?vault=obsidian&file=30%20Resources/Resources%20MOC.md",
+    "real_path": "30 Resources/Resources MOC.md"
+  },
+  {
+    "name": "设计部",
+    "desc": "把商业点子、产品假设、技术方案和一人公司方法论整理成可执行蓝图。 设计部是输入分流与方案设计中心。先判断董事长输入属于口播稿素材、笔记、任务还是项目想法；素材入素材库，笔记入对应文件，任务先判断可执行性，项目想法先转成清晰计划。",
+    "link": "obsidian://open?vault=obsidian&file=20%20Areas/%E8%AE%BE%E8%AE%A1%20MOC.md",
+    "real_path": "20 Areas/设计 MOC.md"
+  },
+  {
+    "name": "任务部",
+    "desc": "把日记、任务、项目、领域和知识地图串起来，让想法真正进入执行。 任务部是隔离执行中心。按项目部派发的小任务执行，每个任务先查资料部，再完成具体写作、整理、代码、研究或文档工作，执行后交给测试部。",
+    "link": "obsidian://open?vault=obsidian&file=10%20Projects/%E4%BB%BB%E5%8A%A1%E7%9C%8B%E6%9D%BF.md",
+    "real_path": "10 Projects/任务看板.md"
+  },
+  {
+    "name": "项目部",
+    "desc": "调度与拆解中心。接收设计部确认可执行的任务，将其拆成小任务，分配给任务部，并向董事长报告项目已分配。 只接收可执行任务或项目；负责分析任务场景、评估外部工具、创建隔离执行上下文，并实行冷启动式的上下文分发。",
+    "link": "obsidian://open?vault=obsidian&file=",
+    "real_path": ""
+  },
+  {
+    "name": "测试部",
+    "desc": "执行自动化单元测试与跨模型质量审查。只有在测试红绿循环完全通过、对抗审查无漏洞后方可勾选结案 。 测试部是验收与审查中心。检查任务是否完成、结果是否符合目标、是否遗漏边界条件；全部通过后统一返回董事长。",
+    "link": "obsidian://open?vault=obsidian&file=10%20Projects/%E6%B5%8B%E8%AF%95%20MOC.md",
+    "real_path": "10 Projects/测试 MOC.md"
+  },
+  {
+    "name": "董事长",
+    "desc": "一人公司的最高输入源与最终验收人。负责提出想法、战略、任务、口播素材和笔记原始内容；只做方向判断和最终确认，不直接陷入执行细节。 接收测试部最终汇报，决定是否归档、继续迭代或重新交给设计部澄清。",
+    "link": "obsidian://open?vault=obsidian&file=%E8%91%A3%E4%BA%8B%E9%95%BF%E5%AE%A4.md",
+    "real_path": "董事长室.md"
+  }
+]

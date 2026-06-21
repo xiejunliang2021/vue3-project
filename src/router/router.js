@@ -88,15 +88,23 @@ router.beforeEach((to, from, next) => {
   const title = to.meta.title ? `${to.meta.title} - 花本无心` : "花本无心";
   document.title = title;
 
-  // 设置 Favicon (如果 meta 中有 icon 字段)
+  // 设置 Favicon
   if (to.meta.icon) {
     setFavicon(to.meta.icon);
   } else {
-    // 默认 Favicon
     setFavicon("/vite.svg");
   }
 
-  next();
+  // 统一身份验证拦截
+  const token = localStorage.getItem('accessToken');
+  
+  if (to.path !== '/login' && !token) {
+    // 未登录用户，且访问的不是登录页，强制跳转登录页
+    next('/login');
+  } else {
+    // 已登录或访问登录页，放行
+    next();
+  }
 });
 
 export default router;
