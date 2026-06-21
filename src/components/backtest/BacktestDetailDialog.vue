@@ -122,8 +122,8 @@
         <h3 class="section-title">
           <el-icon><List /></el-icon>
           交易日志
-          <el-tag v-if="tradeLogs.length > 0" type="info" size="small">
-            共 {{ tradeLogs.length }} 笔交易
+          <el-tag v-if="totalTrades > 0" type="info" size="small">
+            共 {{ totalTrades }} 笔交易
           </el-tag>
         </h3>
 
@@ -172,6 +172,20 @@
             </template>
           </el-table-column>
         </el-table>
+        
+        <!-- Pagination -->
+        <div class="pagination-container" v-if="totalTrades > 0">
+          <el-pagination
+            v-model:current-page="currentPage"
+            v-model:page-size="pageSize"
+            :page-sizes="[10, 15, 20, 50]"
+            :total="totalTrades"
+            layout="total, sizes, prev, pager, next, jumper"
+            @size-change="handleSizeChange"
+            @current-change="handlePageChange"
+            background
+          />
+        </div>
       </div>
     </div>
   </el-dialog>
@@ -203,6 +217,9 @@ const dialogVisible = computed({
 
 const loadingTrades = ref(false)
 const tradeLogs = ref([])
+const currentPage = ref(1)
+const pageSize = ref(15)  // 默认每页15条
+const totalTrades = ref(0)
 
 // Load trade logs when dialog opens
 watch(() => props.modelValue, async (newVal) => {
@@ -214,32 +231,32 @@ watch(() => props.modelValue, async (newVal) => {
 const loadTradeLogs = async () => {
   loadingTrades.value = true
   try {
-    console.log('开始加载交易日志, backtest ID:', props.backtest.id)
-    const response = await getTradeLogList(props.backtest.id)
+    console.log('开始加载交易日志, backtest ID:', props.backtest.id, '页码:', currentPage.value, '每页:', pageSize.value)
+    const response = await getTradeLogList(props.backtest.id, currentPage.value, pageSize.value)
     console.log('交易日志 API 响应:', response)
     
     // 处理不同的响应格式
     // DRF 分页格式: {count, next, previous, results}
     if (response.results && Array.isArray(response.results)) {
       tradeLogs.value = response.results
-      console.log(`解析后的交易日志数量: ${response.results.length} / 总数: ${response.count}`)
-      if (response.next) {
-        console.warn('注意: 还有更多交易日志,当前只显示第一页')
-        ElMessage.info(`加载了 ${response.results.length} 条交易日志,共 ${response.count} 条`)
-      }
+      totalTrades.value = response.count || 0
+      console.log(`解析后的交易日志数量: ${response.results.length} / 总数: ${totalTrades.value}`)
     } 
     // 普通格式: {data: [...]}
     else if (response.data) {
       tradeLogs.value = Array.isArray(response.data) ? response.data : []
+      totalTrades.value = tradeLogs.value.length
       console.log('解析后的交易日志数量:', tradeLogs.value.length)
     } 
     // 直接数组格式: [...]
     else if (Array.isArray(response)) {
       tradeLogs.value = response
+      totalTrades.value = response.length
       console.log('解析后的交易日志数量:', tradeLogs.value.length)
     } 
     else {
       tradeLogs.value = []
+      totalTrades.value = 0
       console.log('解析后的交易日志数量: 0')
     }
     
@@ -257,9 +274,23 @@ const loadTradeLogs = async () => {
     })
     ElMessage.error(`加载交易日志失败: ${error.response?.data?.detail || error.message}`)
     tradeLogs.value = []
+    totalTrades.value = 0
   } finally {
     loadingTrades.value = false
   }
+}
+
+// 页码改变
+const handlePageChange = (page) => {
+  currentPage.value = page
+  loadTradeLogs()
+}
+
+// 每页数量改变
+const handleSizeChange = (size) => {
+  pageSize.value = size
+  currentPage.value = 1  // 重置到第一页
+  loadTradeLogs()
 }
 
 // Format helpers
@@ -468,6 +499,33 @@ const handleDelete = async () => {
 
 .loss {
   color: #EF4444;
+}
+
+.pagination-container {
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: center;
+}
+
+:deep(.el-pagination) {
+  --el-pagination-bg-color: rgba(255, 255, 255, 0.05);
+  --el-pagination-text-color: #94A3B8;
+  --el-pagination-button-disabled-bg-color: rgba(255, 255, 255, 0.02);
+  --el-pagination-hover-color: #3B82F6;
+}
+
+:deep(.el-pagination.is-background .el-pager li) {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: #94A3B8;
+}
+
+:deep(.el-pagination.is-background .el-pager li:not(.is-disabled).is-active) {
+  background-color: #3B82F6;
+  color: white;
+}
+
+:deep(.el-pagination.is-background .el-pager li:not(.is-disabled):hover) {
+  color: #3B82F6;
 }
 
 @media (max-width: 768px) {

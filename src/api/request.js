@@ -1,20 +1,21 @@
 import axios from 'axios'
 import { useAuthStore } from '@/stores/auth'
+import router from '@/router/router'
 
 const service = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000',
-    timeout: 30000,  // 增加到30秒
+    timeout: 30000,
     withCredentials: true
 })
 
 // Request interceptor
 service.interceptors.request.use(
     config => {
-        // You can add token here if needed, or other headers
-        // const authStore = useAuthStore()
-        // if (authStore.token) {
-        //   config.headers['Authorization'] = 'Bearer ' + authStore.token
-        // }
+        // 添加 Bearer Token
+        const authStore = useAuthStore()
+        if (authStore.accessToken) {
+            config.headers['Authorization'] = 'Bearer ' + authStore.accessToken
+        }
         return config
     },
     error => {
@@ -26,14 +27,25 @@ service.interceptors.request.use(
 // Response interceptor
 service.interceptors.response.use(
     response => {
-        const res = response.data
-        // You can handle custom error codes here
-        return res
+        return response.data
     },
-    error => {
+    async error => {
         console.error('Response Error:', error)
+
+        // 处理 401 未授权错误
+        if (error.response && error.response.status === 401) {
+            const authStore = useAuthStore()
+            authStore.logout()
+
+            // 重定向到登录页
+            if (router.currentRoute.value.path !== '/login') {
+                router.push('/login')
+            }
+        }
+
         return Promise.reject(error)
     }
 )
 
 export default service
+

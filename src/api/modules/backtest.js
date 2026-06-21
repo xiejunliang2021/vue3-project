@@ -27,10 +27,14 @@ export function getPortfolioBacktestDetail(id) {
 }
 
 // 获取交易日志
-export function getTradeLogList(backtestId) {
+export function getTradeLogList(backtestId, page = 1, pageSize = 15) {
     return request({
         url: `/api/backtest/portfolio/${backtestId}/trades/`,
-        method: 'get'
+        method: 'get',
+        params: {
+            page,
+            page_size: pageSize
+        }
     })
 }
 
