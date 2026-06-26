@@ -45,7 +45,7 @@ const routes = [
   {
     path: "/favorites/study",
     component: () => import("@/pages/NavigationCollection.vue"),
-    meta: { title: "学习导航", icon: emojiFavicon("🎓") }
+    meta: { title: "智能体网络", icon: emojiFavicon("🪐") }
   },
   {
     path: "/favorites/vps",

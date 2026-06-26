@@ -16,6 +16,10 @@
                 </el-menu-item>
               </template>
             </router-link>
+            <!-- 新增对 Hermes Agent Dashboard 的外部链接跳转 -->
+            <el-menu-item index="1-2" @click="openDashboard">
+              Hermes Dashboard
+            </el-menu-item>
           </el-menu-item-group>
           <el-menu-item-group title="Group 2">
             <el-menu-item index="1-3">Option 3</el-menu-item>
@@ -27,7 +31,7 @@
             <router-link to="/favorites/study" custom>
               <template #default="{ navigate, href }">
                 <el-menu-item index="1-4-1" :href="href" @click="navigate">
-                  学习相关
+                  智能体网络
                 </el-menu-item>
               </template>
             </router-link>
@@ -87,6 +91,10 @@
 import { House, Notification, Money } from "@element-plus/icons-vue";
 
 defineProps(["title"]);
+
+const openDashboard = () => {
+  window.open('/hermes-dashboard/', '_blank');
+};
 </script>
 
 <style scoped>

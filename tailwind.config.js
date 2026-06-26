@@ -14,7 +14,7 @@ export default {
           dim: '#003B00',
         },
         scifi: {
-          bg: '#020B1C',
+          bg: 'url(/cyberpunk-bg.jpg) no-repeat center center / cover',
           glass: 'rgba(16, 33, 65, 0.6)',
           accent: '#00F3FF',
           border: 'rgba(0, 243, 255, 0.3)',
