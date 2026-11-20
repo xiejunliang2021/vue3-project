@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>竖屏分镜 8</title>
+  <style>
+    :root {
+      --bg: #060913;
+      --green: #39ff14;
+      --red: #ff3b3b;
+      --cyan: #00fff0;
+      --magenta: #ff2d78;
+      --blue: #00b3ff;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg);
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Courier New', Courier, monospace;
+      color: #ffffff;
+    }
+    #stage {
+      position: relative;
+      width: 640px;
+      height: 1138px;
+      background: #060913;
+      border: 2px solid #1a233d;
+      box-shadow: 0 0 20px rgba(0, 243, 255, 0.1);
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+    .cyber-card {
+      position: absolute;
+      border: 2px solid var(--border-color, #1a233d);
+      background: rgba(6, 9, 19, 0.95);
+      padding: 15px;
+      box-sizing: border-box;
+      box-shadow: 0 0 15px var(--glow-color, rgba(0, 243, 255, 0.15));
+      border-radius: 4px;
+    }
+    .font-mono {
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+    }
+  </style>
+  <script type="text/javascript" src="js/gsap.min.js"></script>
+</head>
+<body>
+  <div id="stage" data-composition-id="root" data-start="0" data-duration="12" data-width="640" data-height="1138">
+    
+      <div style="position: absolute; left: 50px; top: 120px; width: 540px; height: 800px; display: flex; flex-direction: column; gap: 30px;">
+        <!-- Sage -->
+        <div id="agent-sage" class="cyber-card" style="height: 370px; opacity: 0; --border-color: var(--cyan); --glow-color: rgba(0, 255, 240, 0.15); display: flex; flex-direction: column; align-items: center; padding: 15px;">
+          <div class="font-mono" style="font-size: 24px; color: var(--cyan);">Sage (Twitter)</div>
+          <div style="font-size: 54px; margin-top: 5px;">🦉</div>
+          <div id="sage-chart" style="width: 100%; height: 110px; display: flex; align-items: flex-end; justify-content: space-around; gap: 15px; margin-top: 20px; border-bottom: 2px solid #1a233d;">
+            <div class="bar" style="width: 35px; height: 0%; background: #555;"></div>
+            <div class="bar" style="width: 35px; height: 0%; background: var(--green); box-shadow: 0 0 8px var(--green);"></div>
+            <div class="bar" style="width: 35px; height: 0%; background: #555;"></div>
+            <div class="bar" style="width: 35px; height: 0%; background: var(--green); box-shadow: 0 0 8px var(--green);"></div>
+            <div class="bar" style="width: 35px; height: 0%; background: var(--red); box-shadow: 0 0 8px var(--red);"></div>
+          </div>
+          <div class="font-mono" style="font-size: 12px; color: #8c92ac; margin-top: 15px;">分析互动规律，自动追踪行业热点...</div>
+        </div>
+        <!-- Nova -->
+        <div id="agent-nova" class="cyber-card" style="height: 370px; opacity: 0; --border-color: var(--magenta); --glow-color: rgba(255, 45, 120, 0.15); display: flex; flex-direction: column; align-items: center; padding: 15px;">
+          <div class="font-mono" style="font-size: 24px; color: var(--magenta);">Nova (YouTube)</div>
+          <div style="font-size: 54px; margin-top: 5px;">🦅</div>
+          <div id="nova-anim" class="cyber-card" style="width: 80%; height: 110px; margin-top: 20px; --border-color: var(--magenta); display: flex; justify-content: center; align-items: center; font-size: 48px;">
+             🎬
+          </div>
+          <div class="font-mono" style="font-size: 12px; color: #8c92ac; margin-top: 15px;">智能追踪热点，自动编写视频脚本...</div>
+        </div>
+      </div>
+      <div id="subtitle" style="position: absolute; bottom: 80px; left: 50px; right: 50px; text-align: center; font-size: 28px; color: #fff; line-height: 1.6;">养了两个内容智能体：负责推特数据的Sage与YouTube的Nova。</div>
+
+  </div>
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tl = gsap.timeline({ paused: true });
+    
+    
+    tl.fromTo("#agent-sage", {y: 40, opacity: 0}, {y: 0, opacity: 1, duration: 0.6}, 0.2);
+    tl.fromTo("#agent-nova", {y: 40, opacity: 0}, {y: 0, opacity: 1, duration: 0.6}, 0.8);
+    const bars = document.querySelectorAll("#sage-chart .bar");
+    tl.to(bars[0], {height: "60%", duration: 0.4}, 1.2);
+    tl.to(bars[1], {height: "90%", duration: 0.4}, 1.4);
+    tl.to(bars[2], {height: "40%", duration: 0.4}, 1.6);
+    tl.to(bars[3], {height: "95%", duration: 0.4}, 1.8);
+    tl.to(bars[4], {height: "20%", duration: 0.4}, 2.0);
+    tl.to("#nova-anim", {scale: 1.1, rotation: 5, duration: 0.5, yoyo: true, repeat: 3}, 2.2);
+    tl.fromTo("#subtitle", {opacity: 0}, {opacity: 1, duration: 0.5}, 0.2);
+
+    
+    window.__timelines["root"] = tl;
+    
+    window.addEventListener('message', (e) => {
+      if (!e.data) return;
+      if (e.data.type === 'togglePlay') {
+        if (tl.paused()) tl.play(); else tl.pause();
+      } else if (e.data.type === 'restart') {
+        tl.restart();
+      } else if (e.data.type === 'setSpeed') {
+        tl.timeScale(e.data.speed);
+      }
+    });
+  </script>
+</body>
+</html>

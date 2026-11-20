@@ -48,9 +48,27 @@ const routes = [
     meta: { title: "智能体网络", icon: emojiFavicon("🪐") }
   },
   {
+    path: "/graph-collection",
+    name: "GraphCollection",
+    component: () => import("@/pages/GraphCollection.vue"),
+    meta: { title: "口播图谱", icon: emojiFavicon("🎬") }
+  },
+  {
     path: "/favorites/vps",
     component: () => import("@/pages/VpsCollection.vue"),
     meta: { title: "VPS导航", icon: emojiFavicon("☁️") }
+  },
+  {
+    path: "/node-config",
+    name: "NodeConfigManager",
+    component: () => import("@/views/NodeConfigManager.vue"),
+    meta: { title: "节点转换器", icon: emojiFavicon("⚡") }
+  },
+  {
+    path: "/subscriptions",
+    name: "SubscriptionManager",
+    component: () => import("@/views/SubscriptionManager.vue"),
+    meta: { title: "专属订阅管理", icon: emojiFavicon("📡") }
   },
   {
     path: "/backtest",

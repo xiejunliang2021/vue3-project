@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>你的AI助手正在悄悄进化 — Hermes Agent B-Roll 动效</title>
+  <!-- Tailwind CSS & GSAP & PixiJS v8 CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.1.0/pixi.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #0b0d16;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow: hidden;
+    }
+    .glow-effect {
+      filter: drop-shadow(0 0 15px rgba(0, 255, 204, 0.6));
+    }
+    .cyber-card {
+      background: rgba(11, 13, 22, 0.85);
+      border: 1px solid rgba(0, 255, 204, 0.3);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 0 20px rgba(0, 255, 204, 0.15);
+    }
+  </style>
+</head>
+<body class="w-screen h-screen flex flex-col justify-between items-center relative select-none">
+
+  <!-- 顶部标题与字幕提词面板 -->
+  <header class="w-full max-w-4xl px-6 pt-6 z-20 flex flex-col items-center">
+    <div class="px-4 py-1.5 rounded-full cyber-card text-xs font-mono text-cyan-400 mb-3 tracking-widest uppercase flex items-center gap-2">
+      <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+      Saily B-Roll 动效引擎 · Hermes Agent 进化论
+    </div>
+    <div id="subtitle-box" class="cyber-card w-full p-4 rounded-xl text-center min-h-[80px] flex items-center justify-center transition-all duration-500">
+      <p id="subtitle-text" class="text-base md:text-lg text-cyan-100 font-medium leading-relaxed tracking-wide">
+        正在加载动效分镜引擎...
+      </p>
+    </div>
+  </header>
+
+  <!-- 中央 WebGL Pixi 画布舞台 -->
+  <main id="stage-container" class="w-full flex-1 relative flex items-center justify-center z-10">
+    <canvas id="pixi-canvas" class="w-full h-full block"></canvas>
+  </main>
+
+  <!-- 底部进度条与播放控制 -->
+  <footer class="w-full max-w-4xl px-6 pb-6 z-20 flex flex-col items-center gap-2">
+    <div class="w-full bg-gray-800/60 rounded-full h-1.5 overflow-hidden border border-cyan-500/20">
+      <div id="progress-bar" class="bg-gradient-to-r from-cyan-400 via-purple-500 to-amber-400 h-full w-0 transition-all duration-100"></div>
+    </div>
+    <div class="flex items-center justify-between w-full text-xs font-mono text-gray-400">
+      <span id="time-text">00:00 / 00:00</span>
+      <button id="replay-btn" class="hover:text-cyan-400 transition-colors cursor-pointer px-3 py-1 rounded border border-cyan-500/30">
+        ↻ 重新播放
+      </button>
+    </div>
+  </footer>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      // 场景分镜数据
+      const scenes = [
+        {
+          id: 1, duration: 6.8,
+          subtitle: "你有没有用过一个AI工具，用了半年之后，它还是那个样子——不认识你，不记得你的习惯，每次都要重新解释？大多数AI工具就是这样。你在进化，它原地踏步。但我最近发现了一个东西，彻底改变了我对AI助手的认知。"
+        },
+        {
+          id: 2, duration: 6.2,
+          subtitle: "我们来聊聊一个真实场景。早上起来，我们要花一个小时：看科技新闻、刷邮件、整理待办事项、盯着竞品更新——全是手动的，全是重复的，全在消耗我们最宝贵的注意力。你有没有想过，这些事情本来就不应该由人来做？"
+        },
+        {
+          id: 3, duration: 7.2,
+          subtitle: "这里有个大坑。我们以为的AI助手，其实只是一个聪明的搜索框。你问它，它答你，然后它就忘了。但 Hermes Agent 不是这样工作的。它有三样东西是大多数AI工具都没有的：持久记忆、自我进化的技能库，还有定时自动执行的任务机器人。 简单说，你用它越多，它越懂你。不是你去学它——是它在学你。"
+        },
+        {
+          id: 4, duration: 7.8,
+          subtitle: "我们拿最核心的三个能力来说。第一，记忆系统。 它会把我们告诉它的偏好、工作风格、常用工具，全部存到记忆库里。下次对话不用重复背景，直接开干。第二，技能进化。 当我们反复做同一类任务，它会自动把这个流程固化成一个「技能」，下次一键调用，省掉所有重复操作。这个机制的名字叫 Curator，它在后台静默运行，不需要我们手动触发。第三，定时任务。 我们可以设置它每天早上七点，自动抓取AI新闻摘要，处理好了直接推送到 Telegram，我们起床就能看到——不花一分钱，用本地模型就能跑。"
+        },
+        {
+          id: 5, duration: 7.0,
+          subtitle: "我自己是怎么用的？我把 Hermes 接了 Obsidian，它帮我整理每天的碎片笔记、归档口播素材，还会把行动任务自动推到任务看板。我设置了一个定时任务：每天晚上10点，它自动整理今天的新增笔记，分类存好，同步推送。我睡觉它在干活，我起床它汇报结果。这才是我们理解的那种\"AI工作流\"——不是锦上添花，是真的替我们省时间。"
+        },
+        {
+          id: 6, duration: 6.8,
+          subtitle: "对比一下就很清楚了。普通AI工具：你问一次，它答一次，下次你还得重头解释。Hermes：你用一次，它学一次，下次比你更清楚你要什么。而且它是完全开源的，能接本地模型，能接 OpenAI、Claude、Gemini，你有多少预算，就配多少算力。最低成本，零订阅费，用自己的机器跑，数据完全在自己手里。"
+        },
+        {
+          id: 7, duration: 6.0,
+          subtitle: "如果你现在还在用那种\"问一次忘一次\"的AI工具，我们建议你认真看一眼 Hermes。它不是未来，它就是现在。有一句话我觉得说得很准：大多数AI工具，你在学它。Hermes，是它在学你。"
+        }
+      ];
+
+      const totalDuration = scenes.reduce((acc, cur) => acc + cur.duration, 0);
+      const subtitleText = document.getElementById("subtitle-text");
+      const progressBar = document.getElementById("progress-bar");
+      const timeText = document.getElementById("time-text");
+
+      // GSAP 时间轴主框架
+      const tl = gsap.timeline({
+        onUpdate: () => {
+          const cur = tl.time();
+          const progress = (cur / totalDuration) * 100;
+          progressBar.style.width = progress + "%";
+          timeText.innerText = `${formatTime(cur)} / ${formatTime(totalDuration)}`;
+        }
+      });
+
+      let timeCursor = 0;
+      scenes.forEach((scene, index) => {
+        tl.call(() => {
+          subtitleText.style.opacity = 0;
+          setTimeout(() => {
+            subtitleText.innerText = scene.subtitle;
+            subtitleText.style.opacity = 1;
+          }, 150);
+        }, null, timeCursor);
+        timeCursor += scene.duration;
+      });
+
+      document.getElementById("replay-btn").addEventListener("click", () => {
+        tl.restart();
+      });
+
+      function formatTime(sec) {
+        const m = Math.floor(sec / 60).toString().padStart(2, '0');
+        const s = Math.floor(sec % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+      }
+    });
+  </script>
+</body>
+</html>

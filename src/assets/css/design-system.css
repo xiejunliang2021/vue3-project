@@ -3,72 +3,190 @@
 @tailwind utilities;
 
 :root {
-  --matrix-primary: #00FF41;
-  --matrix-bg: #0D0208;
-  --scifi-accent: #00F3FF;
+  --saas-bg: #090D16;
+  --saas-surface: #0E1526;
+  --saas-surface-hover: #162036;
+  --saas-border: rgba(255, 255, 255, 0.08);
+  --saas-border-active: rgba(99, 102, 241, 0.4);
+  --saas-primary: #6366F1;
+  --saas-primary-hover: #4F46E5;
+  --saas-accent: #06B6D4;
+  --saas-text-main: #F8FAFC;
+  --saas-text-muted: #94A3B8;
+
+  /* Backward compatibility for matrix/scifi classes */
+  --matrix-primary: #818CF8;
+  --matrix-bg: #090D16;
+  --scifi-accent: #06B6D4;
 }
 
 body {
-  background-color: var(--matrix-bg);
-  color: var(--matrix-primary);
-  font-family: 'Inter', sans-serif;
+  background-color: var(--saas-bg);
+  color: var(--saas-text-main);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Scrollbar */
+/* Subtle modern SaaS custom scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #000;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--matrix-primary);
-  border-radius: 4px;
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 9999px;
+  transition: background-color 0.2s;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.35);
 }
 
-/* Animations */
-@keyframes flicker {
-  0%, 19.999%, 22%, 62.999%, 64%, 64.999%, 70%, 100% {
-    opacity: 0.99;
-  }
-  20%, 21.999%, 63%, 63.999%, 65%, 69.999% {
-    opacity: 0.4;
-  }
+/* Modern Tech Grid Pattern & Glow */
+.tech-grid-bg {
+  background-image: 
+    radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.12) 0%, transparent 60%),
+    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 100% 100%, 36px 36px, 36px 36px;
 }
 
-.animate-flicker {
-  animation: flicker 4s linear infinite;
-}
-
+/* SaaS Glass Panel */
 .glass-panel {
-  background: rgba(16, 33, 65, 0.6);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(0, 243, 255, 0.3);
-  box-shadow: 0 0 15px rgba(0, 243, 255, 0.1);
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.scanline {
-  width: 100%;
-  height: 100px;
-  z-index: 9999;
-  background: linear-gradient(0deg, rgba(0,0,0,0) 0%, rgba(0, 255, 65, 0.04) 50%, rgba(0,0,0,0) 100%);
-  opacity: 0.1;
-  position: absolute;
-  bottom: 100%;
-  animation: scanline 10s linear infinite;
-  pointer-events: none;
+.glass-panel:hover {
+  border-color: rgba(99, 102, 241, 0.3);
+  box-shadow: 0 8px 30px -4px rgba(0, 0, 0, 0.6), 0 0 15px -3px rgba(99, 102, 241, 0.15);
 }
 
-@keyframes scanline {
-  0% {
-    bottom: 100%;
-  }
-  80% {
-    bottom: -100%;
-  }
-  100% {
-    bottom: -100%;
-  }
+/* SaaS Button Utilities */
+.saas-btn-primary {
+  background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.saas-btn-primary:hover {
+  background: linear-gradient(135deg, #4F46E5 0%, #4338CA 100%);
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.saas-btn-secondary {
+  background: rgba(30, 41, 59, 0.7);
+  color: #E2E8F0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.saas-btn-secondary:hover {
+  background: rgba(51, 65, 85, 0.85);
+  color: #FFFFFF;
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+/* Modern Status Pill Badge */
+.saas-badge-success {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(16, 185, 129, 0.1);
+  color: #34D399;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.saas-badge-indigo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(99, 102, 241, 0.1);
+  color: #A5B4FC;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+/* Element Plus Dark Mode Overrides for Tech SaaS */
+.el-dialog {
+  background: #0F172A !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8) !important;
+}
+
+.el-dialog__title {
+  color: #F8FAFC !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em !important;
+}
+
+.el-input__wrapper, .el-textarea__inner {
+  background-color: rgba(15, 23, 42, 0.8) !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1) inset !important;
+  border-radius: 8px !important;
+  color: #F8FAFC !important;
+}
+
+.el-input__wrapper.is-focus, .el-textarea__inner:focus {
+  box-shadow: 0 0 0 1.5px #6366F1 inset, 0 0 15px rgba(99, 102, 241, 0.2) !important;
+}
+
+.el-button--primary {
+  --el-button-bg-color: #6366F1 !important;
+  --el-button-border-color: #4F46E5 !important;
+  --el-button-hover-bg-color: #4F46E5 !important;
+  --el-button-hover-border-color: #4338CA !important;
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+}
+
+.el-button--default {
+  background: rgba(30, 41, 59, 0.6) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #E2E8F0 !important;
+  border-radius: 8px !important;
+}
+
+.el-button--default:hover {
+  background: rgba(51, 65, 85, 0.8) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  color: #FFFFFF !important;
+}
+
+/* Table styling */
+.el-table {
+  --el-table-bg-color: transparent !important;
+  --el-table-tr-bg-color: transparent !important;
+  --el-table-header-bg-color: rgba(15, 23, 42, 0.8) !important;
+  --el-table-border-color: rgba(255, 255, 255, 0.06) !important;
+  --el-table-text-color: #E2E8F0 !important;
+  --el-table-header-text-color: #94A3B8 !important;
+  --el-table-row-hover-bg-color: rgba(99, 102, 241, 0.06) !important;
+}
+
+/* Card overrides */
+.el-card {
+  background-color: rgba(15, 23, 42, 0.65) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px !important;
+  color: #F8FAFC !important;
 }

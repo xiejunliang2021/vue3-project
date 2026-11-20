@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scene 5: 智能管家与无感缝合</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0b0d16;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #network {
+            width: 100%;
+            height: 100%;
+        }
+        /* Cyberpunk Navigation Panel */
+        .nav-control {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            z-index: 100;
+            font-family: 'Courier New', Courier, monospace;
+            background: rgba(11, 13, 22, 0.85);
+            border: 1px solid #00ffcc;
+            padding: 10px 24px;
+            border-radius: 6px;
+            color: #fff;
+            box-shadow: 0 0 15px rgba(0, 255, 204, 0.25);
+            pointer-events: auto;
+        }
+        .nav-btn {
+            color: #00ffcc;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 13px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .nav-btn:hover {
+            text-shadow: 0 0 8px #00ffcc;
+            color: #fff;
+        }
+        .nav-btn.disabled {
+            color: #555;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        .scene-indicator {
+            color: #8c92ac;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div id="network"></div>
+
+    <div class="nav-control">
+        <a href="saas_vs_local_scene4.html" class="nav-btn">&lt;- 上一幕</a>
+        <span class="scene-indicator">分镜 5 / 5</span>
+        <span class="nav-btn disabled">下一幕</span>
+    </div>
+
+    <script type="text/javascript">
+        var nodesArray = [{"id": 1, "label": "AI 自动管家", "value": 35, "color": {"background": "#00ffcc", "border": "#00ffcc"}}, {"id": 2, "label": "Inbox 收集箱", "value": 25, "color": {"background": "#ffaa00", "border": "#ffaa00"}}, {"id": 3, "label": "目录索引.md\\n(PARA 架构)", "value": 25, "color": {"background": "#39ff14", "border": "#39ff14"}}, {"id": 4, "label": "任务看板.md", "value": 20, "color": {"background": "#00b3ff", "border": "#00b3ff"}}, {"id": 5, "label": "口播素材稿", "value": 20, "color": {"background": "#00b3ff", "border": "#00b3ff"}}, {"id": 6, "label": "技术笔记目录", "value": 20, "color": {"background": "#00b3ff", "border": "#00b3ff"}}];
+        var edgesArray = [{"from": 1, "to": 2, "label": "定期扫描"}, {"from": 1, "to": 3, "label": "遵循规范"}, {"from": 1, "to": 4, "label": "提取任务并汇总"}, {"from": 1, "to": 5, "label": "置顶插入灵感"}, {"from": 1, "to": 6, "label": "分类建链归档"}];
+
+        var container = document.getElementById('network');
+        var data = {
+            nodes: new vis.DataSet(nodesArray),
+            edges: new vis.DataSet(edgesArray)
+        };
+
+        var options = {
+            nodes: {
+                shape: 'dot',
+                font: {
+                    color: '#ffffff',
+                    size: 15,
+                    face: 'monospace',
+                    strokeWidth: 2,
+                    strokeColor: '#0b0d16'
+                },
+                borderWidth: 2,
+                shadow: {
+                    enabled: true,
+                    color: 'rgba(0, 255, 204, 0.3)',
+                    size: 10,
+                    x: 0,
+                    y: 0
+                }
+            },
+            edges: {
+                color: {
+                    color: 'rgba(255, 255, 255, 0.2)',
+                    highlight: '#00ffcc',
+                    hover: '#00ffcc'
+                },
+                font: {
+                    color: '#8c92ac',
+                    size: 11,
+                    face: 'monospace',
+                    strokeWidth: 1,
+                    strokeColor: '#0b0d16'
+                },
+                arrows: {
+                    to: { enabled: true, scaleFactor: 0.5 }
+                },
+                smooth: {
+                    enabled: true,
+                    type: 'cubicBezier',
+                    roundness: 0.5
+                }
+            },
+            physics: {
+                enabled: true,
+                solver: 'forceAtlas2Based',
+                forceAtlas2Based: {
+                    gravitationalConstant: -180,
+                    centralGravity: 0.015,
+                    springConstant: 0.04,
+                    springLength: 150,
+                    damping: 0.45,
+                    avoidOverlap: 1
+                },
+                stabilization: {
+                    enabled: false
+                }
+            },
+            interaction: {
+                hover: true,
+                dragNodes: true,
+                dragView: true,
+                zoomView: true
+            }
+        };
+
+        var network = new vis.Network(container, data, options);
+
+        // Keyboard navigation
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'ArrowLeft') {
+                var prev = "saas_vs_local_scene4.html";
+                if (prev) window.location.href = prev;
+            } else if (event.key === 'ArrowRight') {
+                var next = "";
+                if (next) window.location.href = next;
+            }
+        });
+    </script>
+</body>
+</html>

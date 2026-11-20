@@ -3,7 +3,8 @@ import { useAuthStore } from '@/stores/auth'
 import router from '@/router/router'
 
 const service = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000',
+    // 生产环境默认走同源 /api 代理，避免把浏览器请求指向本机 localhost 导致登录永远失败
+    baseURL: import.meta.env.VITE_API_BASE_URL || '/',
     timeout: 30000,
     withCredentials: true
 })

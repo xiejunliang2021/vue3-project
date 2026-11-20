@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { login } from '@/api/modules/auth'
+import { login as loginApi, loginByKey as loginByKeyApi } from '@/api/modules/auth'
 
 export const useAuthStore = defineStore('auth', {
     state: () => ({
@@ -16,9 +16,31 @@ export const useAuthStore = defineStore('auth', {
     },
 
     actions: {
+        async loginByKey(key) {
+            try {
+                const response = await loginByKeyApi(key)
+
+                // 后端返回格式: { access, refresh, user }
+                this.accessToken = response.access
+                this.refreshToken = response.refresh
+                this.user = response.user
+                this.isAuthenticated = true
+
+                // 持久化到 localStorage
+                localStorage.setItem('accessToken', response.access)
+                localStorage.setItem('refreshToken', response.refresh)
+                localStorage.setItem('user', JSON.stringify(response.user))
+
+                return response
+            } catch (error) {
+                this.logout()
+                throw error
+            }
+        },
+
         async login(username, password) {
             try {
-                const response = await login(username, password)
+                const response = await loginApi(username, password)
 
                 // 后端返回格式: { access, refresh, user }
                 this.accessToken = response.access

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>竖屏分镜 4</title>
+  <style>
+    :root {
+      --bg: #060913;
+      --green: #39ff14;
+      --red: #ff3b3b;
+      --cyan: #00fff0;
+      --magenta: #ff2d78;
+      --blue: #00b3ff;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg);
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Courier New', Courier, monospace;
+      color: #ffffff;
+    }
+    #stage {
+      position: relative;
+      width: 640px;
+      height: 1138px;
+      background: #060913;
+      border: 2px solid #1a233d;
+      box-shadow: 0 0 20px rgba(0, 243, 255, 0.1);
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+    .cyber-card {
+      position: absolute;
+      border: 2px solid var(--border-color, #1a233d);
+      background: rgba(6, 9, 19, 0.95);
+      padding: 15px;
+      box-sizing: border-box;
+      box-shadow: 0 0 15px var(--glow-color, rgba(0, 243, 255, 0.15));
+      border-radius: 4px;
+    }
+    .font-mono {
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+    }
+  </style>
+  <script type="text/javascript" src="js/gsap.min.js"></script>
+</head>
+<body>
+  <div id="stage" data-composition-id="root" data-start="0" data-duration="8" data-width="640" data-height="1138">
+    
+      <div style="position: absolute; left: 120px; top: 120px; width: 400px; display: flex; flex-direction: column; gap: 40px; align-items: center;">
+        <div id="item-team" style="text-align: center; position: relative; width: 100px;">
+          <div style="font-size: 72px;">👥</div>
+          <div style="font-size: 20px; color: #8c92ac; margin-top: 5px;">团队</div>
+          <svg style="position: absolute; top:0; left:0; width:100%; height:100%; overflow:visible;">
+             <line id="line-team" x1="-15" y1="-10" x2="115" y2="90" stroke="var(--red)" stroke-width="6" stroke-linecap="round" style="stroke-dasharray: 200; stroke-dashoffset: 200;" />
+          </svg>
+        </div>
+        <div id="item-office" style="text-align: center; position: relative; width: 100px;">
+          <div style="font-size: 72px;">🏢</div>
+          <div style="font-size: 20px; color: #8c92ac; margin-top: 5px;">办公室</div>
+          <svg style="position: absolute; top:0; left:0; width:100%; height:100%; overflow:visible;">
+             <line id="line-office" x1="-15" y1="-10" x2="115" y2="90" stroke="var(--red)" stroke-width="6" stroke-linecap="round" style="stroke-dasharray: 200; stroke-dashoffset: 200;" />
+          </svg>
+        </div>
+        <div id="item-degree" style="text-align: center; position: relative; width: 120px;">
+          <div style="font-size: 72px;">🎓</div>
+          <div style="font-size: 20px; color: #8c92ac; margin-top: 5px;">计算机学位</div>
+          <svg style="position: absolute; top:0; left:0; width:100%; height:100%; overflow:visible;">
+             <line id="line-degree" x1="-15" y1="-10" x2="135" y2="95" stroke="var(--red)" stroke-width="6" stroke-linecap="round" style="stroke-dasharray: 250; stroke-dashoffset: 250;" />
+          </svg>
+        </div>
+      </div>
+      
+      <div id="tutorial-card" class="cyber-card font-mono" style="position: absolute; left: 100px; top: 320px; width: 440px; opacity: 0; transform: scale(0.9); --border-color: var(--cyan); --glow-color: rgba(0, 255, 240, 0.2); padding: 25px;">
+        <div style="color: var(--cyan); font-size: 20px;">▶ 免费视频教程</div>
+        <div style="margin-top: 25px; height: 14px; background: #1a233d; border-radius: 7px; overflow: hidden;">
+          <div id="tut-progress" style="width: 0%; height: 100%; background: var(--cyan); box-shadow: 0 0 8px var(--cyan);"></div>
+        </div>
+        <div style="font-size: 14px; color: #8c92ac; margin-top: 15px; text-align: right;">Progress: <span id="tut-percent">0</span>%</div>
+      </div>
+      
+      <div id="subtitle" style="position: absolute; bottom: 80px; left: 50px; right: 50px; text-align: center; font-size: 28px; color: #fff; line-height: 1.6;">他没有团队，没有办公室，甚至没有计算机学位。所有的本事都是看免费教程学来的。</div>
+
+  </div>
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tl = gsap.timeline({ paused: true });
+    
+    
+    tl.fromTo("#item-team", {y: 30, opacity: 0}, {y: 0, opacity: 1, duration: 0.5}, 0.2);
+    tl.to(document.querySelector("#line-team").style, {strokeDashoffset: 0, duration: 0.4}, 0.8);
+    
+    tl.fromTo("#item-office", {y: 30, opacity: 0}, {y: 0, opacity: 1, duration: 0.5}, 1.0);
+    tl.to(document.querySelector("#line-office").style, {strokeDashoffset: 0, duration: 0.4}, 1.6);
+    
+    tl.fromTo("#item-degree", {y: 30, opacity: 0}, {y: 0, opacity: 1, duration: 0.5}, 1.8);
+    tl.to(document.querySelector("#line-degree").style, {strokeDashoffset: 0, duration: 0.4}, 2.4);
+    
+    tl.to(["#item-team", "#item-office", "#item-degree"], {opacity: 0, y: -20, duration: 0.5}, 3.2);
+    tl.to("#tutorial-card", {opacity: 1, scale: 1, duration: 0.6, ease: "back.out(1.5)"}, 3.6);
+    tl.to("#tut-progress", {width: "75%", duration: 2.5, ease: "power1.inOut"}, 4.2);
+    
+    const tutObj = { val: 0 };
+    tl.to(tutObj, {
+      val: 75,
+      duration: 2.5,
+      ease: "power1.inOut",
+      onUpdate: () => {
+        document.querySelector("#tut-percent").innerText = Math.floor(tutObj.val);
+      }
+    }, 4.2);
+    
+    tl.fromTo("#subtitle", {opacity: 0}, {opacity: 1, duration: 0.5}, 0.2);
+
+    
+    window.__timelines["root"] = tl;
+    
+    window.addEventListener('message', (e) => {
+      if (!e.data) return;
+      if (e.data.type === 'togglePlay') {
+        if (tl.paused()) tl.play(); else tl.pause();
+      } else if (e.data.type === 'restart') {
+        tl.restart();
+      } else if (e.data.type === 'setSpeed') {
+        tl.timeScale(e.data.speed);
+      }
+    });
+  </script>
+</body>
+</html>

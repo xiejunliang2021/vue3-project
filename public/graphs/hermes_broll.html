@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>你的AI助手正在悄悄进化 — B-Roll</title>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#080b14;color:#00ffcc;font-family:'Courier New',monospace;overflow:hidden;height:100vh;width:100vw;}
+#grid-bg{position:fixed;inset:0;z-index:0;
+  background-image:linear-gradient(rgba(0,255,204,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,204,0.04) 1px,transparent 1px);
+  background-size:40px 40px;pointer-events:none;}
+#stage{position:fixed;inset:0;z-index:1;}
+.scene{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0;pointer-events:none;}
+.scene.active{pointer-events:auto;}
+#hud{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:50;width:84vw;max-width:680px;
+  background:rgba(8,11,20,0.9);border:1px solid rgba(0,255,204,0.35);border-radius:22px;
+  padding:8px 16px;backdrop-filter:blur(12px);box-shadow:0 0 20px rgba(0,255,204,0.1);}
+#hud-label{font-size:10px;color:rgba(0,255,204,0.4);letter-spacing:3px;margin-bottom:3px;}
+#hud-clip{height:calc(1.45em * 2);overflow:hidden;}
+#hud-text{font-size:12px;line-height:1.45;color:#ddfff8;font-family:sans-serif;display:block;}
+#progress-wrap{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);width:80vw;max-width:580px;z-index:50;}
+#prog-bar-bg{height:2px;background:rgba(0,255,204,0.12);border-radius:2px;}
+#prog-bar{height:2px;width:0%;background:linear-gradient(90deg,#aa00ff,#00ffcc);border-radius:2px;}
+#prog-info{display:flex;justify-content:space-between;margin-top:5px;font-size:10px;color:rgba(0,255,204,0.35);letter-spacing:1px;}
+#key-hint{position:fixed;bottom:44px;right:20px;font-size:10px;color:rgba(0,255,204,0.3);letter-spacing:1px;z-index:50;}
+.node{position:absolute;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;transform:translate(-50%,-50%);}
+.node-label{font-size:12px;font-weight:700;line-height:1.3;}
+.node-sub{font-size:9px;opacity:0.6;margin-top:2px;}
+.rect-node{position:absolute;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px 14px;transform:translate(-50%,-50%);}
+.hex{clip-path:polygon(25% 0%,75% 0%,100% 50%,75% 100%,25% 100%,0% 50%);}
+.glow-cyan{box-shadow:0 0 16px rgba(0,255,204,0.45),0 0 36px rgba(0,255,204,0.15);}
+.glow-gold{box-shadow:0 0 16px rgba(255,215,0,0.45),0 0 36px rgba(255,215,0,0.15);}
+.glow-purple{box-shadow:0 0 16px rgba(170,0,255,0.45),0 0 36px rgba(170,0,255,0.15);}
+.glow-green{box-shadow:0 0 14px rgba(57,255,20,0.45),0 0 32px rgba(57,255,20,0.15);}
+.glow-red{box-shadow:0 0 16px rgba(255,50,80,0.45),0 0 36px rgba(255,50,80,0.15);}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.cursor{animation:blink 0.9s infinite;}
+@keyframes breathe-gold{0%,100%{text-shadow:0 0 20px rgba(255,215,0,0.5)}50%{text-shadow:0 0 50px rgba(255,215,0,1),0 0 80px rgba(255,215,0,0.4)}}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+</style>
+</head>
+<body>
+<div id="grid-bg"></div>
+<div id="hud">
+  <div id="hud-label">SCENE <span id="scene-num">1</span> // HERMES AGENT</div>
+  <div id="hud-clip"><span id="hud-text"></span></div>
+</div>
+<div id="stage"><!-- scenes injected by JS --></div>
+<div id="progress-wrap">
+  <div id="prog-bar-bg"><div id="prog-bar"></div></div>
+  <div id="prog-info"><span id="prog-scene">1 / 11</span><span id="prog-time">0s</span></div>
+</div>
+<div id="key-hint">SPACE 暂停 · → 下一幕 · ← 上一幕</div>
+<div id="stage">
+
+<!-- ══ S1 认知破局 ══ -->
+<div class="scene" id="s1">
+  <!-- 传统 AI 容器 -->
+  <div id="s1-container" style="position:relative;width:130px;height:130px;display:flex;align-items:center;justify-content:center;">
+    <!-- 实体圆圈 -->
+    <div id="s1-node" style="position:absolute;width:100%;height:100%;border-radius:50%;border:2px solid rgba(255,50,80,0.6);background:rgba(255,50,80,0.06);display:flex;flex-direction:column;align-items:center;justify-content:center;" class="glow-red">
+      <div style="font-size:26px;color:#ff3350;letter-spacing:4px;" id="s1-q">? ? ?</div>
+      <div style="font-size:10px;color:rgba(255,80,80,0.6);margin-top:6px;">传统 AI 工具</div>
+    </div>
+    <!-- 破碎时飞散的6个几何碎片 -->
+    <div class="s1-shard" style="position:absolute;width:24px;height:24px;background:#ff3350;clip-path:polygon(50% 0%, 100% 100%, 0% 100%);opacity:0;"></div>
+    <div class="s1-shard" style="position:absolute;width:20px;height:20px;background:#ff5577;clip-path:polygon(0% 0%, 100% 0%, 50% 100%);opacity:0;"></div>
+    <div class="s1-shard" style="position:absolute;width:28px;height:28px;background:#ff3350;clip-path:polygon(25% 0%, 75% 0%, 100% 100%, 0% 100%);opacity:0;"></div>
+    <div class="s1-shard" style="position:absolute;width:22px;height:22px;background:#ff5577;clip-path:polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);opacity:0;"></div>
+    <div class="s1-shard" style="position:absolute;width:26px;height:26px;background:#ff3350;clip-path:polygon(0% 50%, 100% 0%, 80% 100%);opacity:0;"></div>
+    <div class="s1-shard" style="position:absolute;width:18px;height:18px;background:#ff5577;clip-path:polygon(50% 0%, 100% 100%, 0% 50%);opacity:0;"></div>
+  </div>
+  <div id="s1-sub" style="position:absolute;bottom:22%;font-size:11px;color:rgba(255,80,80,0.45);letter-spacing:3px;opacity:0;">── 无记忆 · 无积累 · 原地踏步 ──</div>
+</div>
+
+<!-- ══ S2 你vs工具对立 ══ -->
+<div class="scene" id="s2">
+  <div style="position:absolute;inset:0;display:grid;grid-template-columns:1fr 3px 1fr;">
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;">
+      <div style="font-size:11px;color:rgba(0,255,204,0.45);letter-spacing:3px;">你</div>
+      <svg width="150" height="90" viewBox="0 0 150 90" style="overflow:visible;">
+        <polyline id="s2-up" points="0,85 37,60 75,38 112,18 150,5" fill="none" stroke="#00ffcc" stroke-width="2.5" stroke-dasharray="350" stroke-dashoffset="350"/>
+      </svg>
+      <div id="s2-up-lbl" style="color:#00ffcc;font-size:20px;font-weight:900;opacity:0;">↑ 持续进化</div>
+    </div>
+    <div style="background:linear-gradient(180deg,transparent,rgba(255,255,255,0.12),transparent);"></div>
+    <div id="s2-right" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;filter:saturate(0.15);">
+      <div style="font-size:11px;color:rgba(255,80,80,0.45);letter-spacing:3px;">AI工具</div>
+      <svg width="150" height="90" viewBox="0 0 150 90">
+        <line id="s2-flat" x1="0" y1="45" x2="150" y2="45" stroke="#ff3350" stroke-width="2" stroke-dasharray="180" stroke-dashoffset="180"/>
+      </svg>
+      <div style="color:#ff3350;font-size:16px;text-decoration:line-through;opacity:0.5;">── 原地踏步</div>
+    </div>
+  </div>
+  <div id="s2-hermes" style="position:absolute;bottom:14%;font-size:clamp(20px,5vw,32px);font-weight:900;color:#ffd700;letter-spacing:4px;opacity:0;animation:breathe-gold 2s ease-in-out infinite;">★ HERMES AGENT</div>
+</div>
+
+<!-- ══ S3 痛点量化 ══ -->
+<div class="scene" id="s3">
+  <!-- 辐射连线 SVG -->
+  <svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;">
+    <line id="s3-l1" x1="50%" y1="14%" x2="50%" y2="46%" stroke="#ff3350" stroke-width="1.5" stroke-dasharray="4 4" stroke-dashoffset="100" opacity="0"/>
+    <line id="s3-l2" x1="84%" y1="46%" x2="50%" y2="46%" stroke="#ff3350" stroke-width="1.5" stroke-dasharray="4 4" stroke-dashoffset="100" opacity="0"/>
+    <line id="s3-l3" x1="50%" y1="78%" x2="50%" y2="46%" stroke="#ff3350" stroke-width="1.5" stroke-dasharray="4 4" stroke-dashoffset="100" opacity="0"/>
+    <line id="s3-l4" x1="16%" y1="46%" x2="50%" y2="46%" stroke="#ff3350" stroke-width="1.5" stroke-dasharray="4 4" stroke-dashoffset="100" opacity="0"/>
+  </svg>
+  <!-- 中心倒计时圆 -->
+  <svg style="position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);z-index:1;" width="130" height="130">
+    <circle cx="65" cy="65" r="52" fill="none" stroke="rgba(255,80,80,0.12)" stroke-width="8"/>
+    <circle id="s3-ring" cx="65" cy="65" r="52" fill="none" stroke="#ff3350" stroke-width="4" stroke-dasharray="327" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 65 65)"/>
+    <text id="s3-num" x="65" y="62" text-anchor="middle" fill="#ff3350" font-size="20" font-weight="700" font-family="Courier New">60</text>
+    <text x="65" y="76" text-anchor="middle" fill="rgba(255,80,80,0.5)" font-size="9">分钟/天</text>
+  </svg>
+  <div id="s3-c1" class="rect-node glow-red" style="left:50%;top:14%;width:120px;border:1px solid rgba(255,100,0,0.45);background:rgba(255,100,0,0.07);color:#ff9900;opacity:0;z-index:2;"><div class="node-label">📰 科技新闻</div><div class="node-sub">手动刷取</div></div>
+  <div id="s3-c2" class="rect-node glow-red" style="left:84%;top:46%;width:110px;border:1px solid rgba(255,100,0,0.45);background:rgba(255,100,0,0.07);color:#ff9900;opacity:0;z-index:2;"><div class="node-label">📧 邮件</div><div class="node-sub">逐条处理</div></div>
+  <div id="s3-c3" class="rect-node glow-red" style="left:50%;top:78%;width:120px;border:1px solid rgba(255,100,0,0.45);background:rgba(255,100,0,0.07);color:#ff9900;opacity:0;z-index:2;"><div class="node-label">📋 整理待办</div><div class="node-sub">人工归档</div></div>
+  <div id="s3-c4" class="rect-node glow-red" style="left:16%;top:46%;width:110px;border:1px solid rgba(255,100,0,0.45);background:rgba(255,100,0,0.07);color:#ff9900;opacity:0;z-index:2;"><div class="node-label">🔍 竞品监控</div><div class="node-sub">盯着刷新</div></div>
+</div>
+
+<!-- ══ S4 搜索框死穴 ══ -->
+<div class="scene" id="s4">
+  <svg style="position:absolute;inset:0;width:100%;height:100%;opacity:0.05;pointer-events:none;">
+    <defs><pattern id="chip" x="0" y="0" width="60" height="60" patternUnits="userSpaceOnUse">
+      <line x1="0" y1="30" x2="60" y2="30" stroke="#00ffcc" stroke-width="0.5"/>
+      <line x1="30" y1="0" x2="30" y2="60" stroke="#00ffcc" stroke-width="0.5"/>
+    </pattern></defs>
+    <rect width="100%" height="100%" fill="url(#chip)"/>
+  </svg>
+  <div id="s4-box" style="width:min(460px,88vw);border:1px solid rgba(0,255,204,0.28);border-radius:16px;padding:18px 22px;background:rgba(0,255,204,0.04);opacity:0;">
+    <div style="font-size:10px;color:rgba(0,255,204,0.38);margin-bottom:10px;letter-spacing:2px;">// AI 对话框</div>
+    <div id="s4-q" style="color:#ddfff8;font-size:13px;min-height:18px;margin-bottom:10px;"></div>
+    <div id="s4-a" style="color:#00ffcc;font-size:13px;min-height:18px;border-top:1px solid rgba(0,255,204,0.12);padding-top:10px;opacity:0;"></div>
+  </div>
+  <div id="s4-forget" style="margin-top:20px;font-size:14px;color:rgba(255,80,80,0.8);letter-spacing:3px;opacity:0;">⚡ 记忆已清除 · 重新开始</div>
+  <div id="s4-label" style="position:absolute;bottom:20%;font-size:11px;color:rgba(255,80,80,0.5);letter-spacing:2px;opacity:0;">无记忆 · 无积累 · 每次从零</div>
+</div>
+
+</div><!-- #stage partial, more scenes coming -->
+
+<!-- ══ S5 三大支柱亮相 ══ -->
+<div class="scene" id="s5" style="flex-direction:column;gap:0;">
+  <div id="s5-title" style="font-size:clamp(22px,5vw,38px);font-weight:900;color:#ffd700;letter-spacing:4px;margin-bottom:40px;opacity:0;">★ HERMES AGENT</div>
+  <div style="display:flex;gap:clamp(14px,4vw,36px);align-items:flex-start;">
+    <div id="s5-p1" style="opacity:0;display:flex;flex-direction:column;align-items:center;gap:10px;">
+      <div class="hex glow-purple" style="width:88px;height:88px;background:rgba(170,0,255,0.12);border:2px solid #aa00ff;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+        <div style="font-size:11px;font-weight:700;color:#aa00ff;text-align:center;">持久记忆<br><span style="font-size:9px;opacity:0.6;">Memory</span></div>
+      </div>
+    </div>
+    <div id="s5-p2" style="opacity:0;display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:-16px;">
+      <div class="hex glow-gold" style="width:108px;height:108px;background:rgba(255,215,0,0.1);border:2px solid #ffd700;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+        <div style="font-size:12px;font-weight:700;color:#ffd700;text-align:center;">自进化<br><span style="font-size:9px;opacity:0.6;">Curator</span></div>
+      </div>
+    </div>
+    <div id="s5-p3" style="opacity:0;display:flex;flex-direction:column;align-items:center;gap:10px;">
+      <div class="hex glow-green" style="width:88px;height:88px;background:rgba(57,255,20,0.1);border:2px solid #39ff14;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+        <div style="font-size:11px;font-weight:700;color:#39ff14;text-align:center;">定时任务<br><span style="font-size:9px;opacity:0.6;">Cron</span></div>
+      </div>
+    </div>
+  </div>
+  <div id="s5-tagline" style="margin-top:32px;font-size:12px;color:rgba(0,255,204,0.5);letter-spacing:3px;opacity:0;">── 你用得越多 · 它越懂你 ──</div>
+</div>
+
+<!-- ══ S6 Memory 深拆 ══ -->
+<div class="scene" id="s6">
+  <div style="position:relative;width:min(560px,92vw);height:210px;">
+    <div id="s6-user" style="position:absolute;left:4%;top:50%;transform:translateY(-50%);width:78px;height:78px;border-radius:50%;border:2px solid #00ffcc;background:rgba(0,255,204,0.07);display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0;" class="glow-cyan">
+      <div style="font-size:22px;">👤</div><div style="font-size:9px;color:rgba(0,255,204,0.55);">用户</div>
+    </div>
+    <svg style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;">
+      <defs>
+        <marker id="a1" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#aa00ff"/></marker>
+      </defs>
+      <!-- 基础管道虚线 -->
+      <path id="s6-flow" d="M82,105 C160,55 290,55 372,105" fill="none" stroke="rgba(170,0,255,0.2)" stroke-width="1.5" stroke-dasharray="5 4" opacity="0"/>
+      <!-- 高亮流动实体管线 -->
+      <path id="s6-flow-active" d="M82,105 C160,55 290,55 372,105" fill="none" stroke="#aa00ff" stroke-width="2" stroke-dasharray="350" stroke-dashoffset="350" opacity="0" marker-end="url(#a1)"/>
+      <!-- 动态流动光点群组 -->
+      <g id="s6-dots" opacity="0">
+        <circle r="4" fill="#00ffcc" filter="drop-shadow(0 0 4px #00ffcc)">
+          <animateMotion dur="2s" repeatCount="indefinite" path="M82,105 C160,55 290,55 372,105" keyTimes="0;1" keySplines="0.4 0 0.2 1" calcMode="spline" />
+        </circle>
+        <circle r="3" fill="#aa00ff" filter="drop-shadow(0 0 4px #aa00ff)">
+          <animateMotion dur="2s" begin="0.6s" repeatCount="indefinite" path="M82,105 C160,55 290,55 372,105" keyTimes="0;1" keySplines="0.4 0 0.2 1" calcMode="spline" />
+        </circle>
+        <circle r="3" fill="#ffd700" filter="drop-shadow(0 0 4px #ffd700)">
+          <animateMotion dur="2s" begin="1.2s" repeatCount="indefinite" path="M82,105 C160,55 290,55 372,105" keyTimes="0;1" keySplines="0.4 0 0.2 1" calcMode="spline" />
+        </circle>
+      </g>
+    </svg>
+    <div id="s6-mem" style="position:absolute;right:2%;top:50%;transform:translateY(-50%);width:175px;border:1px solid #aa00ff;border-radius:12px;padding:11px;background:rgba(170,0,255,0.06);opacity:0;" class="glow-purple">
+      <div style="font-size:9px;color:#aa00ff;letter-spacing:2px;margin-bottom:7px;">MEMORY VAULT</div>
+      <div class="mem-e" style="font-size:11px;color:rgba(200,150,255,0.85);padding:2px 6px;border-left:2px solid #aa00ff;margin-bottom:3px;opacity:0;">偏好：简洁行动派</div>
+      <div class="mem-e" style="font-size:11px;color:rgba(200,150,255,0.85);padding:2px 6px;border-left:2px solid #aa00ff;margin-bottom:3px;opacity:0;">风格：Saily PARA</div>
+      <div class="mem-e" style="font-size:11px;color:rgba(200,150,255,0.85);padding:2px 6px;border-left:2px solid #aa00ff;opacity:0;">工具：Obsidian+Hermes</div>
+    </div>
+  </div>
+  <div id="s6-counter" style="margin-top:14px;font-size:12px;color:#00ffcc;opacity:0;">
+    使用次数：<span id="s6-n" style="font-size:22px;font-weight:900;color:#ffd700;">0</span> · 记忆持续增长
+  </div>
+</div>
+
+<!-- ══ S7 Curator 技能进化 ══ -->
+<div class="scene" id="s7" style="gap:18px;position:relative;">
+  <!-- 屏幕闪白遮罩 -->
+  <div id="s7-flash" style="position:absolute;inset:0;background:#ffffff;opacity:0;pointer-events:none;z-index:10;"></div>
+  
+  <div style="display:flex;gap:10px;">
+    <div class="s7t" style="padding:7px 13px;border:1px dashed rgba(255,80,80,0.4);border-radius:8px;font-size:11px;color:rgba(255,80,80,0.65);opacity:0;">📋 同类任务 ×1</div>
+    <div class="s7t" style="padding:7px 13px;border:1px dashed rgba(255,80,80,0.4);border-radius:8px;font-size:11px;color:rgba(255,80,80,0.65);opacity:0;">📋 同类任务 ×2</div>
+    <div class="s7t" style="padding:7px 13px;border:1px dashed rgba(255,80,80,0.4);border-radius:8px;font-size:11px;color:rgba(255,80,80,0.65);opacity:0;">📋 同类任务 ×3</div>
+  </div>
+  <div id="s7-gear" style="width:88px;height:88px;border-radius:50%;border:2px solid #ffd700;background:rgba(255,215,0,0.08);display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0;z-index:2;" class="glow-gold">
+    <div id="s7-gear-icon" style="font-size:30px;display:inline-block;">⚙️</div>
+    <div style="font-size:9px;color:#ffd700;letter-spacing:1px;">CURATOR</div>
+  </div>
+  <div id="s7-skill" style="padding:14px 26px;border:1px solid #ffd700;border-radius:14px;background:rgba(255,215,0,0.06);text-align:center;opacity:0;z-index:2;" class="glow-gold">
+    <div style="font-size:13px;font-weight:700;color:#ffd700;">⚡ 新技能已固化</div>
+    <div style="font-size:10px;color:rgba(255,215,0,0.55);margin-top:4px;">下次一键调用 · 省掉所有重复</div>
+  </div>
+  <div id="s7-tag" style="position:absolute;bottom:18%;right:8%;font-size:10px;color:rgba(0,255,204,0.4);opacity:0;">Curator 静默运行中<span class="cursor">█</span></div>
+</div>
+
+<!-- ══ S8 Cron 定时任务 ══ -->
+<div class="scene" id="s8">
+  <div style="display:flex;align-items:center;gap:clamp(18px,5vw,54px);">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:10px;">
+      <div id="s8-clock" style="font-size:clamp(30px,7vw,50px);font-weight:900;color:#39ff14;font-family:'Courier New';text-shadow:0 0 22px rgba(57,255,20,0.7);opacity:0;">07:00</div>
+      <div style="font-size:10px;color:rgba(57,255,20,0.45);">每日自动触发</div>
+    </div>
+    <svg id="s8-arc" width="110" height="70" viewBox="0 0 110 70" style="overflow:visible;opacity:0;">
+      <defs><marker id="a2" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#39ff14"/></marker></defs>
+      <path id="s8-p" d="M5,55 Q55,5 105,55" fill="none" stroke="#39ff14" stroke-width="1.5" stroke-dasharray="5 4" stroke-dashoffset="170" stroke-dasharray="170" marker-end="url(#a2)"/>
+    </svg>
+    <div id="s8-tg" style="display:flex;flex-direction:column;align-items:center;gap:8px;opacity:0;">
+      <div style="width:68px;height:68px;border-radius:18px;background:rgba(0,136,204,0.15);border:2px solid #0088cc;display:flex;align-items:center;justify-content:center;font-size:30px;box-shadow:0 0 18px rgba(0,136,204,0.35);">✈️</div>
+      <div style="font-size:10px;color:rgba(0,136,204,0.75);">Telegram</div>
+    </div>
+  </div>
+  <div id="s8-free" style="position:absolute;bottom:20%;padding:8px 16px;border-left:3px solid #39ff14;background:rgba(57,255,20,0.05);font-size:12px;color:#39ff14;opacity:0;letter-spacing:1px;">
+    本地模型运行中 · 费用 $0 · 完全免费
+  </div>
+</div>
+
+</div><!-- #stage —— S9-S11 coming next -->
+
+<!-- ══ S9 Obsidian 实操闭环 ══ -->
+<div class="scene" id="s9">
+  <div style="position:relative;width:min(580px,94vw);height:240px;">
+    <svg style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;">
+      <defs>
+        <marker id="a3" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#aa00ff"/></marker>
+        <marker id="a4" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#ffd700"/></marker>
+      </defs>
+      <!-- 基础虚线连线 -->
+      <line id="s9-l1" x1="20%" y1="50%" x2="43%" y2="50%" stroke="rgba(170,0,255,0.2)" stroke-width="1.5" stroke-dasharray="5 4" opacity="0"/>
+      <line id="s9-l2" x1="57%" y1="50%" x2="80%" y2="50%" stroke="rgba(255,215,0,0.2)" stroke-width="1.5" stroke-dasharray="5 4" opacity="0"/>
+      
+      <!-- 高亮流动实体管线 -->
+      <line id="s9-l1-active" x1="20%" y1="50%" x2="43%" y2="50%" stroke="#aa00ff" stroke-width="2" stroke-dasharray="150" stroke-dashoffset="150" opacity="0" marker-end="url(#a3)"/>
+      <line id="s9-l2-active" x1="57%" y1="50%" x2="80%" y2="50%" stroke="#ffd700" stroke-width="2" stroke-dasharray="150" stroke-dashoffset="150" opacity="0" marker-end="url(#a4)"/>
+      
+      <!-- 动态流动光点 -->
+      <g id="s9-dots-1" opacity="0">
+        <circle r="3" fill="#00ffcc" filter="drop-shadow(0 0 3px #00ffcc)">
+          <animate dur="1.5s" repeatCount="indefinite" attributeName="cx" from="20%" to="43%"/>
+          <animate dur="1.5s" repeatCount="indefinite" attributeName="cy" from="50%" to="50%"/>
+        </circle>
+        <circle r="3" fill="#aa00ff" filter="drop-shadow(0 0 3px #aa00ff)">
+          <animate dur="1.5s" begin="0.7s" repeatCount="indefinite" attributeName="cx" from="20%" to="43%"/>
+          <animate dur="1.5s" begin="0.7s" repeatCount="indefinite" attributeName="cy" from="50%" to="50%"/>
+        </circle>
+      </g>
+      <g id="s9-dots-2" opacity="0">
+        <circle r="3" fill="#ffd700" filter="drop-shadow(0 0 3px #ffd700)">
+          <animate dur="1.5s" repeatCount="indefinite" attributeName="cx" from="57%" to="80%"/>
+          <animate dur="1.5s" repeatCount="indefinite" attributeName="cy" from="50%" to="50%"/>
+        </circle>
+        <circle r="3" fill="#00ffcc" filter="drop-shadow(0 0 3px #00ffcc)">
+          <animate dur="1.5s" begin="0.7s" repeatCount="indefinite" attributeName="cx" from="57%" to="80%"/>
+          <animate dur="1.5s" begin="0.7s" repeatCount="indefinite" attributeName="cy" from="50%" to="50%"/>
+        </circle>
+      </g>
+    </svg>
+    <div id="s9-obs" style="position:absolute;left:5%;top:50%;transform:translateY(-50%);width:90px;height:90px;border-radius:50%;border:2px solid #aa00ff;background:rgba(170,0,255,0.08);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;opacity:0;" class="glow-purple">
+      <div style="font-size:18px;">🔮</div><div style="font-size:9px;color:#aa00ff;margin-top:3px;">Obsidian</div>
+    </div>
+    <div id="s9-bot" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:82px;height:82px;border-radius:50%;border:2px solid #00ffcc;background:rgba(0,255,204,0.07);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;opacity:0;" class="glow-cyan">
+      <div id="s9-gear" style="font-size:16px;display:inline-block;">⚙️</div>
+      <div style="font-size:9px;color:#00ffcc;margin-top:2px;">Hermes Bot</div>
+    </div>
+    <div id="s9-board" style="position:absolute;right:2%;top:50%;transform:translateY(-50%);padding:10px 14px;border:1px solid #ffd700;border-radius:10px;background:rgba(255,215,0,0.06);text-align:center;opacity:0;" class="glow-gold">
+      <div style="font-size:10px;font-weight:700;color:#ffd700;">任务看板</div>
+      <div style="font-size:9px;color:rgba(255,215,0,0.55);margin-top:3px;">自动归档</div>
+    </div>
+  </div>
+  <div style="margin-top:12px;display:flex;gap:16px;font-size:11px;">
+    <span id="s9-night" style="color:rgba(57,255,20,0.6);opacity:0;">🌙 22:00 Hermes 工作中<span class="cursor">█</span></span>
+    <span id="s9-day" style="color:rgba(255,215,0,0.7);opacity:0;">☀️ 07:00 你醒来查收结果</span>
+  </div>
+  <div id="s9-prog-wrap" style="margin-top:14px;width:min(340px,80vw);opacity:0;">
+    <div style="font-size:9px;color:rgba(0,255,204,0.4);margin-bottom:4px;">今日笔记归档进度</div>
+    <div style="height:3px;background:rgba(0,255,204,0.1);border-radius:2px;">
+      <div id="s9-prog" style="height:3px;width:0%;background:linear-gradient(90deg,#aa00ff,#00ffcc);border-radius:2px;"></div>
+    </div>
+    <div id="s9-pct" style="font-size:10px;color:#00ffcc;margin-top:3px;text-align:right;">0%</div>
+  </div>
+</div>
+
+<!-- ══ S10 横向对比降维 ══ -->
+<div class="scene" id="s10">
+  <div style="display:grid;grid-template-columns:1fr 1px 1fr 1px 1fr;gap:0;width:min(700px,96vw);height:260px;">
+    <!-- 普通AI -->
+    <div id="s10-a" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:0 12px;opacity:0;">
+      <div style="font-size:11px;color:rgba(255,80,80,0.5);letter-spacing:2px;margin-bottom:4px;">普通 AI</div>
+      <div style="width:100%;padding:10px;border:1px solid rgba(255,80,80,0.25);border-radius:8px;background:rgba(255,80,80,0.04);font-size:11px;color:rgba(255,80,80,0.7);text-align:center;line-height:1.7;">
+        问 → 答 → 忘<br>问 → 答 → 忘<br><span style="font-size:9px;opacity:0.5;text-decoration:line-through;">积累：0</span>
+      </div>
+    </div>
+    <div style="background:linear-gradient(180deg,transparent,rgba(255,255,255,0.08),transparent);"></div>
+    <!-- Hermes -->
+    <div id="s10-b" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:0 12px;opacity:0;">
+      <div style="font-size:11px;color:rgba(255,215,0,0.6);letter-spacing:2px;margin-bottom:4px;">Hermes</div>
+      <div style="width:100%;padding:10px;border:1px solid rgba(255,215,0,0.35);border-radius:8px;background:rgba(255,215,0,0.05);font-size:11px;color:rgba(255,215,0,0.85);text-align:center;line-height:1.7;" class="glow-gold">
+        用 → 学 → 懂<br>用 → 更懂 → 精准<br><span style="font-size:10px;color:#ffd700;font-weight:700;">积累：+∞</span>
+      </div>
+    </div>
+    <div style="background:linear-gradient(180deg,transparent,rgba(255,255,255,0.08),transparent);"></div>
+    <!-- 多模型 -->
+    <div id="s10-c" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:0 12px;opacity:0;">
+      <div style="font-size:11px;color:rgba(0,255,204,0.5);letter-spacing:2px;margin-bottom:4px;">全模型兼容</div>
+      <div style="font-size:10px;color:rgba(0,255,204,0.65);text-align:center;line-height:1.9;border:1px solid rgba(0,255,204,0.2);border-radius:8px;padding:8px 10px;background:rgba(0,255,204,0.03);">
+        🖥️ Local (Ollama)<br>☁️ OpenAI / Claude<br>✨ Gemini / 任意
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ S11 价值收割 + 行动召唤 ══ -->
+<div class="scene" id="s11" style="flex-direction:column;gap:24px;">
+  <div id="s11-title" style="font-size:clamp(26px,6vw,48px);font-weight:900;color:#ffd700;letter-spacing:5px;text-align:center;opacity:0;animation:breathe-gold 2s ease-in-out infinite;">
+    HERMES AGENT
+  </div>
+  <div id="s11-q1" style="font-size:clamp(13px,3vw,18px);color:rgba(200,200,200,0.7);text-align:center;opacity:0;line-height:1.6;">
+    大多数AI工具，<span style="color:#ff3350;">你在学它</span>。
+  </div>
+  <div id="s11-q2" style="font-size:clamp(14px,3.5vw,22px);color:#00ffcc;font-weight:700;text-align:center;opacity:0;line-height:1.6;text-shadow:0 0 20px rgba(0,255,204,0.5);">
+    Hermes，是<span style="color:#ffd700;">它在学你</span>。
+  </div>
+  <div id="s11-cta" style="padding:12px 28px;border:1px solid rgba(0,255,204,0.4);border-radius:50px;font-size:12px;color:rgba(0,255,204,0.7);letter-spacing:3px;opacity:0;margin-top:8px;">
+    github.com/NousResearch/hermes-agent
+  </div>
+  <!-- 粒子辐射圆圈 -->
+  <svg id="s11-ring" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;opacity:0;" width="300" height="300" viewBox="0 0 300 300">
+    <circle cx="150" cy="150" r="110" fill="none" stroke="rgba(255,215,0,0.12)" stroke-width="1" stroke-dasharray="8 6"/>
+    <circle cx="150" cy="150" r="130" fill="none" stroke="rgba(0,255,204,0.08)" stroke-width="1" stroke-dasharray="4 8"/>
+  </svg>
+</div>
+
+</div><!-- /#stage end -->
+
+<script>
+// 11幕剧本配置
+const scenes = [
+  { id: 1, dur: 6.8, text: "你有没有用过一个AI工具，用了半年之后，它还是那个样子——不认识你，不记得你的习惯，每次都要重新解释？大多数AI工具就是这样。你在进化，它原地踏步。但我最近发现了一个东西，彻底改变了我对AI助手的认知。" },
+  { id: 2, dur: 6.2, text: "我们来聊聊一个真实场景。早上起来，我们要花一个小时：看科技新闻、刷邮件、整理待办事项、盯着竞品更新——全是手动的，全是重复的，全在消耗我们最宝贵的注意力。你有没有想过，这些事情本来就不应该由人来做？" },
+  { id: 3, dur: 7.2, text: "这里有个大坑。我们以为的AI助手，其实只是一个聪明的搜索框。你问它，它答你，然后它就忘了。但 Hermes Agent 不是这样工作的。它有三样东西是大多数AI工具都没有的：持久记忆、自我进化的技能库，还有定时自动执行的任务机器人。 简单说，你用它越多，它越懂你。不是你去学它——是它在学你。" },
+  { id: 4, dur: 7.8, text: "我们拿最核心的三个能力来说。第一，记忆系统。 它会把我们告诉它的偏好、工作风格、常用工具，全部存到记忆库里。下次对话不用重复背景，直接开干。第二，技能进化。 当我们反复做同一类任务，它会自动把这个流程固化成一个「技能」，下次一键调用，省掉所有重复操作。这个机制的名字叫 Curator，它在后台静默运行，不需要我们手动触发。第三，定时任务。 我们可以设置它每天早上七点，自动抓取AI新闻摘要，处理好了直接推送到 Telegram，我们起床就能看到——不花一分钱，用本地模型就能跑。" },
+  { id: 5, dur: 7.0, text: "我自己是怎么用的？我把 Hermes 接了 Obsidian，它帮我整理每天的碎片笔记、归档口播素材，还会把行动任务自动推到任务看板。我设置了一个定时任务：每天晚上10点，它自动整理今天的新增笔记，分类存好，同步推送。我睡觉它在干活，我起床它汇报结果。这才是我们理解的那种\"AI工作流\"——不是锦上添花，是真的替我们省时间。" },
+  { id: 6, dur: 6.8, text: "对比一下就很清楚了。普通AI工具：你问一次，它答一次，下次你还得重头解释。Hermes：你用一次，它学一次，下次比你更清楚你要什么。而且它是完全开源的，能接本地模型，能接 OpenAI、Claude、Gemini，你有多少预算，就配多少算力。最低成本，零订阅费，用自己的机器跑，数据完全在自己手里。" },
+  { id: 7, dur: 6.0, text: "如果你现在还在用那种\"问一次忘一次\"的AI工具，我们建议你认真看一眼 Hermes。它不是未来，它就是现在。有一句话我觉得说得很准：大多数AI工具，你在学它。Hermes，是它在学你。" },
+  { id: 8, dur: 6.5, text: "我们可以设置它每天早上七点，自动抓取AI新闻摘要，处理好了直接推送到 Telegram，我们起床就能看到——不花一分钱，用本地模型就能跑。" },
+  { id: 9, dur: 7.0, text: "我设置了一个定时任务：每天晚上10点，它自动整理今天的新增笔记，分类存好，同步推送。我睡觉它在干活，我起床它汇报结果。" },
+  { id: 10, dur: 6.8, text: "普通AI工具：你问一次，它答一次。Hermes：你用一次，它学一次。全模型兼容，按算力自主配置，数据完全在自己手里。" },
+  { id: 11, dur: 6.0, text: "大多数AI工具，你在学它。Hermes，是它在学你。项目开源地址已附，欢迎体验。" }
+];
+
+const totalDur = scenes.reduce((a, b) => a + b.dur, 0);
+let currentIdx = 0;
+let mainTl = null;
+
+// DOM
+const hudNum = document.getElementById('scene-num');
+const hudText = document.getElementById('hud-text');
+const progBar = document.getElementById('prog-bar');
+const progScene = document.getElementById('prog-scene');
+const progTime = document.getElementById('prog-time');
+
+// 初始化 GSAP
+function buildDirectorTimeline() {
+  mainTl = gsap.timeline({
+    onUpdate: () => {
+      const time = mainTl.time();
+      const pct = (time / totalDur) * 100;
+      progBar.style.width = pct + '%';
+      progTime.innerText = Math.floor(time) + 's / ' + Math.floor(totalDur) + 's';
+    }
+  });
+
+  let t = 0;
+  scenes.forEach((sc, i) => {
+    // 切换 HUD 字幕
+    mainTl.call(() => {
+      currentIdx = i;
+      hudNum.innerText = i + 1;
+      hudText.innerText = sc.text;
+      progScene.innerText = (i + 1) + ' / ' + scenes.length;
+      
+      // 处理手机端字幕纵向自动平滑滚动
+      const clipH = document.getElementById('hud-clip').clientHeight;
+      const textH = hudText.scrollHeight;
+      const overflow = textH - clipH;
+      gsap.killTweensOf(hudText);
+      gsap.set(hudText, { y: 0 });
+      if (overflow > 2) {
+        gsap.to(hudText, {
+          y: -overflow,
+          duration: sc.dur * 0.85,
+          ease: 'power1.inOut',
+          delay: sc.dur * 0.1
+        });
+      }
+
+      // 场景显隐控制
+      document.querySelectorAll('.scene').forEach((el, idx) => {
+        if (idx === i) {
+          el.classList.add('active');
+          gsap.to(el, { opacity: 1, duration: 0.4 });
+        } else {
+          el.classList.remove('active');
+          gsap.to(el, { opacity: 0, duration: 0.3 });
+        }
+      });
+
+      // 针对各 Scene 触发动画分镜
+      playSceneAnimation(i + 1, sc.dur);
+    }, null, t);
+
+    t += sc.dur;
+  });
+}
+
+function playSceneAnimation(num, dur) {
+  if (num === 1) {
+    // 重置碎片
+    document.querySelectorAll('.s1-shard').forEach(el => {
+      gsap.set(el, { opacity: 0, x: 0, y: 0, scale: 1, rotation: 0 });
+    });
+
+    // 主节点弹入
+    gsap.fromTo('#s1-node', { scale: 0.3, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.8, ease: 'back.out(1.5)' });
+    gsap.fromTo('#s1-sub', { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.6, delay: 0.4 });
+
+    // 在第 4.0 秒触发物理碎裂 (shatter)
+    setTimeout(() => {
+      gsap.to('#s1-node', { scale: 1.3, opacity: 0, duration: 0.2, ease: 'power2.in', onComplete: () => {
+        gsap.set('#s1-node', { scale: 0 });
+      }});
+
+      // 6 个碎片从中心散射出去
+      const angles = [0, 60, 120, 180, 240, 300];
+      const distances = [120, 140, 110, 130, 150, 125];
+      document.querySelectorAll('.s1-shard').forEach((shard, idx) => {
+        const rad = (angles[idx] * Math.PI) / 180;
+        const tx = Math.cos(rad) * distances[idx];
+        const ty = Math.sin(rad) * distances[idx];
+        
+        gsap.fromTo(shard, 
+          { opacity: 1, x: 0, y: 0, scale: 1, rotation: 0 },
+          { opacity: 0, x: tx, y: ty, scale: 0.2, rotation: 360, duration: 0.7, ease: 'power3.out' }
+        );
+      });
+    }, 4000);
+  } 
+  else if (num === 2) {
+    gsap.fromTo('#s2-up', { strokeDashoffset: 350 }, { strokeDashoffset: 0, duration: 1.2, ease: 'power2.inOut' });
+    gsap.fromTo('#s2-flat', { strokeDashoffset: 180 }, { strokeDashoffset: 0, duration: 1.0, ease: 'power1.inOut', delay: 0.2 });
+    gsap.to('#s2-up-lbl', { opacity: 1, duration: 0.5, delay: 0.8 });
+    gsap.to('#s2-hermes', { opacity: 1, y: 0, duration: 0.8, delay: 1.2, ease: 'elastic.out(1,0.5)' });
+  }
+  else if (num === 3) {
+    // 重置倒数
+    document.getElementById('s3-num').innerText = '60';
+    gsap.fromTo('#s3-ring', { strokeDashoffset: 0 }, { strokeDashoffset: 327, duration: dur * 0.8, ease: 'none' });
+    
+    // 数字递减
+    gsap.to({ val: 60 }, {
+      val: 0,
+      duration: dur * 0.8,
+      ease: 'none',
+      onUpdate: function() {
+        document.getElementById('s3-num').innerText = Math.ceil(this.targets()[0].val);
+      }
+    });
+
+    // 4 张卡片弹入
+    ['#s3-c1', '#s3-c2', '#s3-c3', '#s3-c4'].forEach((id, idx) => {
+      gsap.fromTo(id, { scale: 0.3, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, delay: idx * 0.15, ease: 'back.out(1.4)' });
+    });
+
+    // 4 条辐射管线亮起并循环流动
+    ['#s3-l1', '#s3-l2', '#s3-l3', '#s3-l4'].forEach((id, idx) => {
+      gsap.fromTo(id, { opacity: 0 }, { opacity: 0.6, duration: 0.4, delay: 0.5 + idx * 0.1 });
+      gsap.fromTo(id, { strokeDashoffset: 100 }, { strokeDashoffset: 0, duration: 2.0, repeat: -1, ease: 'none', delay: 0.6 });
+    });
+  }
+  else if (num === 4) {
+    // 重置
+    const qEl = document.getElementById('s4-q');
+    const aEl = document.getElementById('s4-a');
+    qEl.innerHTML = '';
+    aEl.innerHTML = '';
+    aEl.style.opacity = 0;
+    gsap.set('#s4-box', { filter: 'blur(0px)', opacity: 1, borderColor: 'rgba(0,255,204,0.28)' });
+    gsap.set('#s4-forget', { opacity: 0, scale: 0.9 });
+    gsap.set('#s4-label', { opacity: 0 });
+
+    gsap.fromTo('#s4-box', { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, ease: 'power3.out' });
+
+    // 问句打字 (0.8s)
+    const qText = "问：怎么帮我整理今天的 AI 论文？";
+    let qIdx = 0;
+    const qTimer = setInterval(() => {
+      if (qIdx < qText.length) {
+        qEl.innerHTML += qText[qIdx];
+        qIdx++;
+      } else {
+        clearInterval(qTimer);
+        // 答句打字 (1.2s)
+        setTimeout(() => {
+          aEl.style.opacity = 1;
+          const aText = "答：已为你提取 5 篇核心结论，已归档。";
+          let aIdx = 0;
+          const aTimer = setInterval(() => {
+            if (aIdx < aText.length) {
+              aEl.innerHTML += aText[aIdx];
+              aIdx++;
+            } else {
+              clearInterval(aTimer);
+              
+              // 触发清除记忆 (忘记) 动效
+              setTimeout(() => {
+                // 红色警示闪烁 + 左右抖动
+                gsap.to('#s4-box', { borderColor: '#ff3350', duration: 0.15, repeat: 3, yoyo: true });
+                gsap.to('#s4-box', { x: '+=6', yoyo: true, repeat: 5, duration: 0.05, onComplete: () => {
+                  gsap.set('#s4-box', { x: 0 });
+                }});
+                
+                // 模糊淡出
+                gsap.to('#s4-box', { filter: 'blur(10px)', opacity: 0.25, duration: 0.6, delay: 0.2 });
+                gsap.fromTo('#s4-forget', { opacity: 0, scale: 0.8 }, { opacity: 1, scale: 1, duration: 0.5, delay: 0.3, ease: 'back.out(1.5)' });
+                gsap.fromTo('#s4-label', { opacity: 0 }, { opacity: 1, duration: 0.5, delay: 0.5 });
+              }, 1200);
+            }
+          }, 60);
+        }, 500);
+      }
+    }, 60);
+  }
+  else if (num === 5) {
+    gsap.fromTo('#s5-title', { scale: 1.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.8, ease: 'power4.out' });
+    gsap.fromTo('#s5-p1', { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, delay: 0.3, ease: 'back.out(1.5)' });
+    gsap.fromTo('#s5-p2', { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, delay: 0.5, ease: 'back.out(1.5)' });
+    gsap.fromTo('#s5-p3', { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, delay: 0.7, ease: 'back.out(1.5)' });
+    gsap.to('#s5-tagline', { opacity: 1, duration: 0.5, delay: 1.0 });
+
+    // 三支柱悬浮微晃 float
+    gsap.to('#s5-p1', { y: '-=6', duration: 2.0, yoyo: true, repeat: -1, ease: 'sine.inOut', delay: 1.0 });
+    gsap.to('#s5-p2', { y: '+=6', duration: 2.4, yoyo: true, repeat: -1, ease: 'sine.inOut', delay: 1.2 });
+    gsap.to('#s5-p3', { y: '-=6', duration: 2.2, yoyo: true, repeat: -1, ease: 'sine.inOut', delay: 1.4 });
+  }
+  else if (num === 6) {
+    // 🌟 Scene 06 数据流高级动画升级
+    gsap.fromTo('#s6-user', { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: 'back.out(1.5)' });
+    gsap.fromTo('#s6-mem', { opacity: 0, x: 20 }, { opacity: 1, x: 0, duration: 0.6, delay: 0.3 });
+    gsap.fromTo('#s6-flow', { opacity: 0 }, { opacity: 1, duration: 0.4, delay: 0.4 });
+    gsap.fromTo('#s6-flow-active', { strokeDashoffset: 350, opacity: 0 }, { strokeDashoffset: 0, opacity: 1, duration: 1.2, delay: 0.5, ease: 'power2.inOut' });
+    gsap.to('#s6-dots', { opacity: 1, duration: 0.4, delay: 0.8 });
+
+    document.querySelectorAll('.mem-e').forEach((el, idx) => {
+      gsap.fromTo(el, { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: 0.4, delay: 1.0 + idx * 0.4 });
+    });
+    gsap.fromTo('#s6-counter', { opacity: 0 }, { opacity: 1, duration: 0.5, delay: 2.2 });
+    gsap.to('#s6-n', {
+      innerText: 87,
+      snap: 'innerText',
+      duration: 2.0,
+      delay: 2.3,
+      ease: 'power2.out'
+    });
+  }
+  else if (num === 7) {
+    // 重置
+    gsap.set('#s7-flash', { opacity: 0 });
+    gsap.set('#s7-skill', { scale: 0.8, opacity: 0 });
+    gsap.set('#s7-gear', { scale: 0, opacity: 0 });
+    const tasks = document.querySelectorAll('.s7t');
+    tasks.forEach(el => gsap.set(el, { opacity: 0, x: 0, y: 0, scale: 1 }));
+
+    // 1. 任务图标卡片依次弹入
+    tasks.forEach((el, idx) => {
+      gsap.fromTo(el, { opacity: 0, y: -12 }, { opacity: 1, y: 0, duration: 0.4, delay: idx * 0.15 });
+    });
+
+    // 2. 齿轮出现
+    gsap.fromTo('#s7-gear', { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, delay: 0.6, ease: 'back.out(1.5)' });
+
+    // 3. 任务图标朝齿轮中心移动吞噬
+    setTimeout(() => {
+      tasks.forEach((el) => {
+        gsap.to(el, { y: 65, scale: 0.2, opacity: 0, duration: 0.5, ease: 'power2.in' });
+      });
+      // 齿轮加速旋转
+      gsap.to('#s7-gear-icon', { rotation: '+=720', duration: 1.0, ease: 'power2.inOut' });
+
+      // 4. 闪白冲击 + 技能弹出
+      setTimeout(() => {
+        gsap.fromTo('#s7-flash', { opacity: 0.6 }, { opacity: 0, duration: 0.4 });
+        gsap.fromTo('#s7-skill', { scale: 0.3, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.7, ease: 'elastic.out(1, 0.4)' });
+        gsap.to('#s7-tag', { opacity: 1, duration: 0.4 });
+      }, 700);
+    }, 1500);
+  }
+  else if (num === 8) {
+    // 重置
+    gsap.set('#s8-tg', { x: 0, scale: 0, opacity: 0 });
+    gsap.set('#s8-scan', { opacity: 0, x: '-110%' });
+
+    // 时钟亮起
+    gsap.fromTo('#s8-clock', { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: 'back.out(1.5)' });
+    
+    // 抛物线绘制
+    gsap.fromTo('#s8-arc', { opacity: 0 }, { opacity: 1, duration: 0.4, delay: 0.3 });
+    gsap.fromTo('#s8-p', { strokeDashoffset: 170 }, { strokeDashoffset: 0, duration: 0.8, delay: 0.4, ease: 'power2.out' });
+
+    // Telegram 图标弹入
+    gsap.fromTo('#s8-tg', { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, delay: 0.8, ease: 'elastic.out(1,0.5)', onComplete: () => {
+      // 触发收到消息的震动提醒
+      gsap.to('#s8-tg', { x: '+=5', yoyo: true, repeat: 7, duration: 0.05 });
+    }});
+
+    // 扫描线过场
+    gsap.to('#s8-scan', { opacity: 0.8, duration: 0.1, delay: 1.0 });
+    gsap.fromTo('#s8-scan', { x: '-110%' }, { x: '110%', duration: 1.2, delay: 1.0, ease: 'power1.inOut' });
+
+    // 零成本标签
+    gsap.to('#s8-free', { opacity: 1, duration: 0.5, delay: 1.2 });
+  }
+  else if (num === 9) {
+    // 重置
+    gsap.set('#s9-prog', { width: '0%' });
+    document.getElementById('s9-pct').innerText = '0%';
+    gsap.set(['#s9-dots-1', '#s9-dots-2'], { opacity: 0 });
+
+    // 节点出现
+    gsap.fromTo('#s9-obs', { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: 'back.out(1.5)' });
+    gsap.fromTo('#s9-bot', { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, delay: 0.2, ease: 'back.out(1.5)' });
+    gsap.to('#s9-gear', { rotation: '+=720', duration: 4, repeat: -1, ease: 'none' });
+    gsap.fromTo('#s9-board', { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, delay: 0.4, ease: 'back.out(1.5)' });
+
+    // 双管道管线与数据流小球
+    gsap.fromTo(['#s9-l1', '#s9-l2'], { opacity: 0 }, { opacity: 1, duration: 0.3, delay: 0.5 });
+    gsap.fromTo('#s9-l1-active', { strokeDashoffset: 150, opacity: 0 }, { strokeDashoffset: 0, opacity: 1, duration: 0.8, delay: 0.6 });
+    gsap.fromTo('#s9-l2-active', { strokeDashoffset: 150, opacity: 0 }, { strokeDashoffset: 0, opacity: 1, duration: 0.8, delay: 1.0 });
+    gsap.to(['#s9-dots-1', '#s9-dots-2'], { opacity: 1, duration: 0.4, delay: 0.8 });
+
+    // 标签与进度条
+    gsap.to('#s9-night', { opacity: 1, duration: 0.4, delay: 0.7 });
+    gsap.to('#s9-day', { opacity: 1, duration: 0.4, delay: 1.3 });
+    gsap.to('#s9-prog-wrap', { opacity: 1, duration: 0.4, delay: 1.5 });
+    
+    // 进度条从 0% 加载至 88%
+    gsap.to('#s9-prog', { width: '88%', duration: 2.2, delay: 1.6, ease: 'power2.out' });
+    gsap.to({ pct: 0 }, {
+      pct: 88,
+      duration: 2.2,
+      delay: 1.6,
+      ease: 'power2.out',
+      onUpdate: function() {
+        document.getElementById('s9-pct').innerText = Math.ceil(this.targets()[0].pct) + '%';
+      }
+    });
+  }
+  else if (num === 10) {
+    // 3列平滑错开滑入
+    gsap.fromTo('#s10-a', { x: -50, opacity: 0 }, { x: 0, opacity: 1, duration: 0.6, ease: 'power3.out' });
+    gsap.fromTo('#s10-b', { y: 40, opacity: 0, scale: 0.9 }, { y: 0, opacity: 1, scale: 1.05, duration: 0.7, delay: 0.2, ease: 'back.out(1.5)' });
+    gsap.fromTo('#s10-c', { x: 50, opacity: 0 }, { x: 0, opacity: 1, duration: 0.6, delay: 0.4, ease: 'power3.out' });
+  }
+  else if (num === 11) {
+    // 标题与金句
+    gsap.fromTo('#s11-title', { scale: 1.8, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.9, ease: 'power4.out' });
+    gsap.fromTo('#s11-q1', { opacity: 0, y: 15 }, { opacity: 1, y: 0, duration: 0.6, delay: 0.4 });
+    gsap.fromTo('#s11-q2', { opacity: 0, y: 15 }, { opacity: 1, y: 0, duration: 0.6, delay: 0.8 });
+    gsap.fromTo('#s11-cta', { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 0.6, delay: 1.2, ease: 'back.out(1.4)' });
+
+    // 同心双环反向自转
+    gsap.fromTo('#s11-ring', { opacity: 0, scale: 0.5 }, { opacity: 1, scale: 1, duration: 1.2, delay: 0.5 });
+    gsap.to('#s11-ring circle:nth-child(1)', { rotation: 360, transformOrigin: 'center', duration: 25, repeat: -1, ease: 'none' });
+    gsap.to('#s11-ring circle:nth-child(2)', { rotation: -360, transformOrigin: 'center', duration: 35, repeat: -1, ease: 'none' });
+  }
+}
+
+// 键盘交互
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') {
+    if (mainTl.paused()) mainTl.play(); else mainTl.pause();
+  } else if (e.code === 'ArrowRight') {
+    if (currentIdx < scenes.length - 1) {
+      let t = 0;
+      for (let i = 0; i <= currentIdx; i++) t += scenes[i].dur;
+      mainTl.seek(t);
+    }
+  } else if (e.code === 'ArrowLeft') {
+    if (currentIdx > 0) {
+      let t = 0;
+      for (let i = 0; i < currentIdx - 1; i++) t += scenes[i].dur;
+      mainTl.seek(t);
+    }
+  }
+});
+
+// 自动安全启动
+document.addEventListener('DOMContentLoaded', () => {
+  buildDirectorTimeline();
+});
+</script>

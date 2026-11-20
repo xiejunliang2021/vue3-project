@@ -1,0 +1,152 @@
+[
+  {
+    "id": "dont_scrape_workflow",
+    "name": "别再让 AI Agent 硬爬视频了 (Saily-Hermes 12分镜解耦动效)",
+    "file": "/graphs/dont_scrape_workflow.html",
+    "date": "2026-07-23"
+  },
+  {
+    "id": "obsidian_silicon_partner",
+    "name": "Obsidian与AI硅基合伙人 (Saily-Hermes 21分镜逐句动效)",
+    "file": "/graphs/obsidian_silicon_partner.html",
+    "date": "2026-07-18"
+  },
+  {
+    "id": "hermes_broll",
+    "name": "你的AI助手正在悄悄进化 (Saily-Hermes B-Roll 精细动效)",
+    "file": "/graphs/hermes_broll.html",
+    "date": "2026-07-03"
+  },
+  {
+    "id": "solopreneur_broll",
+    "name": "一人公司自动化 (Saily-Hermes 视频秒级分镜动效)",
+    "file": "/graphs/solopreneur_broll.html",
+    "date": "2026-07-08"
+  },
+  {
+    "id": "dont_sell_labor",
+    "name": "别再出卖劳动力 (Saily-Hermes 44分镜赛博粗野主义)",
+    "file": "/graphs/dont_sell_labor.html",
+    "date": "2026-07-08"
+  },
+  {
+    "id": "hermes_evolve_workflow",
+    "name": "你的AI助手正在悄悄进化 (Saily-Hermes 自愈成长 B-Roll)",
+    "file": "/graphs/hermes_evolve_workflow.html",
+    "date": "2026-07-03"
+  },
+  {
+    "id": "ai_audit_workflow",
+    "name": "AI审计商业降维打击 (19岁少年狂赚32万刀 B-Roll)",
+    "file": "/graphs/ai_audit_workflow.html",
+    "date": "2026-07-03"
+  },
+  {
+    "id": "ai_audit_sop_workflow",
+    "name": "AI审计傻瓜式SOP与低效成本测算 (B-Roll)",
+    "file": "/graphs/ai_audit_sop_workflow.html",
+    "date": "2026-07-03"
+  },
+  {
+    "id": "agent_obsidian_workflow",
+    "name": "AI Agent 与 Obsidian 无缝自动化流 (GSAP 连贯动画 MOC)",
+    "file": "/graphs/agent_obsidian_workflow.html",
+    "date": "2026-07-01"
+  },
+  {
+    "id": "ai_search_vs_memory",
+    "name": "AI搜索与共享大脑持久记忆 (时序手势MG图)",
+    "file": "/graphs/ai_search_vs_memory.html",
+    "date": "2026-06-30"
+  },
+  {
+    "id": "obsidian_markdown_mg",
+    "name": "Obsidian底层Markdown优势 (GSAP 时间轴MG)",
+    "file": "/graphs/obsidian_markdown_mg.html",
+    "date": "2026-06-30"
+  },
+  {
+    "id": "saas_vs_local_scenes",
+    "name": "SaaS笔记与本地AI降维打击 (连贯分镜图)",
+    "file": "/graphs/saas_vs_local_scene1.html",
+    "date": "2026-06-30"
+  },
+  {
+    "id": "saas_vs_local_brain",
+    "name": "SaaS 笔记牢笼与本地 AI 降维打击",
+    "file": "/graphs/saas_vs_local_brain.html",
+    "date": "2026-06-30"
+  },
+  {
+    "id": "hermes_obsidian_advantages",
+    "name": "Hermes + Obsidian 本地化优势图谱",
+    "file": "/graphs/hermes_obsidian_advantages.html",
+    "date": "2026-06-30"
+  },
+  {
+    "id": "ai_employee_scene_1",
+    "name": "月薪200块AI员工 分镜 1: 钩子对比 (¥200 vs ¥20,000)",
+    "file": "/graphs/scene_1/index.html",
+    "date": "2026-07-13"
+  },
+  {
+    "id": "ai_employee_scene_2",
+    "name": "月薪200块AI员工 分镜 2: 同时指挥 5 个 AI 智能体",
+    "file": "/graphs/scene_2/index.html",
+    "date": "2026-07-13"
+  },
+  {
+    "id": "ai_employee_scene_3",
+    "name": "月薪200块AI员工 分镜 3: 营收曲线与 $4M+",
+    "file": "/graphs/scene_3/index.html",
+    "date": "2026-07-13"
+  },
+  {
+    "id": "ai_employee_scene_4",
+    "name": "月薪200块AI员工 分镜 4: 打破神话与教程",
+    "file": "/graphs/scene_4/index.html",
+    "date": "2026-07-13"
+  },
+  {
+    "id": "ai_employee_scene_5",
+    "name": "月薪200块AI员工 分镜 5: 忙碌陀螺与聊天框",
+    "file": "/graphs/scene_5/index.html",
+    "date": "2026-07-13"
+  },
+  {
+    "id": "ai_employee_scene_6",
+    "name": "月薪200块AI员工 分镜 6: 智能体进化",
+    "file": "/graphs/scene_6/index.html",
+    "date": "2026-07-13"
+  },
+  {
+    "id": "ai_employee_scene_7",
+    "name": "月薪200块AI员工 分镜 7: 六步自动化 Pipeline",
+    "file": "/graphs/scene_7/index.html",
+    "date": "2026-07-13"
+  },
+  {
+    "id": "ai_employee_scene_8",
+    "name": "月薪200块AI员工 分镜 8: 内容智能体 Sage & Nova",
+    "file": "/graphs/scene_8/index.html",
+    "date": "2026-07-13"
+  },
+  {
+    "id": "ai_employee_scene_9",
+    "name": "月薪200块AI员工 分镜 9: 地球线框与指挥",
+    "file": "/graphs/scene_9/index.html",
+    "date": "2026-07-13"
+  },
+  {
+    "id": "ai_employee_scene_10",
+    "name": "月薪200块AI员工 分镜 10: 勒索攻击与风险警示",
+    "file": "/graphs/scene_10/index.html",
+    "date": "2026-07-13"
+  },
+  {
+    "id": "ai_employee_scene_11",
+    "name": "月薪200块AI员工 分镜 11: 行动号召与收尾",
+    "file": "/graphs/scene_11/index.html",
+    "date": "2026-07-13"
+  }
+]

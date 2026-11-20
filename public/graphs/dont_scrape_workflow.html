@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>别再让 AI Agent 硬爬视频了 — B-Roll</title>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #060913; color: #00ffcc; font-family: 'Courier New', monospace; overflow: hidden; height: 100vh; width: 100vw; }
+#grid-bg { position: fixed; inset: 0; z-index: 0;
+  background-image: linear-gradient(rgba(0,255,204,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,204,0.03) 1px,transparent 1px);
+  background-size: 40px 40px; pointer-events: none; }
+#stage { position: fixed; inset: 0; z-index: 1; display: flex; justify-content: center; align-items: center; }
+.scene { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; pointer-events: none; }
+.scene.active { pointer-events: auto; }
+#hud { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 50; width: 84vw; max-width: 680px;
+  background: rgba(6,9,19,0.92); border: 1px solid rgba(0,255,204,0.3); border-radius: 20px;
+  padding: 10px 20px; backdrop-filter: blur(10px); box-shadow: 0 0 20px rgba(0,255,204,0.1); }
+#hud-label { font-size: 10px; color: rgba(0,255,204,0.4); letter-spacing: 3px; margin-bottom: 3px; }
+#hud-clip { height: calc(1.45em * 2); overflow: hidden; }
+#hud-text { font-size: 13px; line-height: 1.45; color: #ddfff8; font-family: sans-serif; display: block; }
+#progress-wrap { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: 80vw; max-width: 580px; z-index: 50; }
+#prog-bar-bg { height: 2px; background: rgba(0,255,204,0.1); border-radius: 2px; }
+#prog-bar { height: 2px; width: 0%; background: linear-gradient(90deg,#aa00ff,#00ffcc); border-radius: 2px; }
+#prog-info { display: flex; justify-content: space-between; margin-top: 5px; font-size: 10px; color: rgba(0,255,204,0.35); letter-spacing: 1px; }
+#key-hint { position: fixed; bottom: 50px; right: 20px; font-size: 10px; color: rgba(0,255,204,0.3); letter-spacing: 1px; z-index: 50; }
+.node { position: absolute; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; transform: translate(-50%,-50%); }
+.node-label { font-size: 14px; font-weight: 700; line-height: 1.3; }
+.node-sub { font-size: 10px; opacity: 0.6; margin-top: 3px; }
+.rect-node { position: absolute; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 12px 18px; transform: translate(-50%,-50%); }
+.glow-cyan { box-shadow: 0 0 16px rgba(0,255,204,0.35), 0 0 36px rgba(0,255,204,0.1); }
+.glow-gold { box-shadow: 0 0 16px rgba(255,215,0,0.35), 0 0 36px rgba(255,215,0,0.1); }
+.glow-purple { box-shadow: 0 0 16px rgba(170,0,255,0.35), 0 0 36px rgba(170,0,255,0.1); }
+.glow-green { box-shadow: 0 0 14px rgba(57,255,20,0.35), 0 0 32px rgba(57,255,20,0.1); }
+.glow-red { box-shadow: 0 0 16px rgba(255,51,102,0.35), 0 0 36px rgba(255,51,102,0.1); }
+.cyber-panel { border: 1px solid rgba(0,255,204,0.2); background: rgba(6,9,19,0.85); box-shadow: 0 0 15px rgba(0,255,204,0.08); }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+.cursor { animation: blink 0.9s infinite; }
+@keyframes breathe-red { 0%,100%{box-shadow: 0 0 15px rgba(255,51,102,0.15);} 50%{box-shadow: 0 0 35px rgba(255,51,102,0.4);} }
+#bg-red-glow { position: fixed; inset: 0; background: radial-gradient(circle, rgba(255,51,102,0.08) 0%, rgba(0,0,0,0) 70%); z-index: 0; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+</style>
+</head>
+<body>
+<div id="grid-bg"></div>
+<div id="bg-red-glow"></div>
+<div id="hud">
+  <div id="hud-label">SCENE <span id="scene-num">1</span> // AUTOMATION PIPELINE</div>
+  <div id="hud-clip"><span id="hud-text"></span></div>
+</div>
+<div id="stage">
+
+  <!-- ══ S1 YouTube Logo ══ -->
+  <div class="scene" id="s1">
+    <div id="s1-logo-container" style="position:relative; width:140px; height:100px; display:flex; align-items:center; justify-content:center;">
+      <svg viewBox="0 0 100 70" width="140" height="100">
+        <path id="s1-yt-path" d="M95,35 C95,35 95,20 90,15 C85,10 70,10 50,10 C30,10 15,10 10,15 C5,20 5,35 5,35 C5,35 5,50 10,55 C15,60 30,60 50,60 C70,60 85,60 90,55 C95,50 95,35 95,35 Z" fill="none" stroke="#ff3366" stroke-width="3" filter="drop-shadow(0 0 8px #ff3366)"></path>
+        <polygon id="s1-yt-play" points="40,22 40,48 65,35" fill="none" stroke="#ff3366" stroke-width="3"></polygon>
+      </svg>
+    </div>
+    <div id="s1-sub" style="margin-top:20px; font-size:12px; color:rgba(255,51,102,0.7); letter-spacing:2px; opacity:0;">// YouTube 链接 (对标源)</div>
+  </div>
+
+  <!-- ══ S2 Glitch Logo & Warnings ══ -->
+  <div class="scene" id="s2">
+    <!-- Duplicate YouTube logo to glitch it -->
+    <div id="s2-logo" style="position:relative; width:120px; height:85px;">
+      <svg viewBox="0 0 100 70" width="120" height="85">
+        <path d="M95,35 C95,35 95,20 90,15 C85,10 70,10 50,10 C30,10 15,10 10,15 C5,20 5,35 5,35 C5,35 5,50 10,55 C15,60 30,60 50,60 C70,60 85,60 90,55 C95,50 95,35 95,35 Z" fill="none" stroke="#ff3366" stroke-width="3" filter="drop-shadow(0 0 8px #ff3366)"></path>
+        <polygon points="40,22 40,48 65,35" fill="none" stroke="#ff3366" stroke-width="3"></polygon>
+      </svg>
+    </div>
+    
+    <!-- Shards for YouTube Logo Shatter -->
+    <div id="s2-shards" style="position:absolute; width:120px; height:85px; pointer-events:none; display:none;">
+      <div class="s2-shard" style="position:absolute; width:12px; height:12px; background:#ff3366; left:30px; top:20px;"></div>
+      <div class="s2-shard" style="position:absolute; width:18px; height:8px; background:#ff3366; left:60px; top:15px;"></div>
+      <div class="s2-shard" style="position:absolute; width:10px; height:15px; background:#ff3366; left:80px; top:40px;"></div>
+      <div class="s2-shard" style="position:absolute; width:15px; height:10px; background:#ff3366; left:20px; top:50px;"></div>
+      <div class="s2-shard" style="position:absolute; width:8px; height:18px; background:#ff3366; left:50px; top:60px;"></div>
+      <div class="s2-shard" style="position:absolute; width:14px; height:14px; background:#ff3366; left:75px; top:25px;"></div>
+    </div>
+
+    <!-- Warnings staggered -->
+    <div id="s2-w1" class="rect-node glow-red cyber-panel" style="left:28%; top:25%; width:160px; color:#ff3366; border-color:#ff3366; opacity:0;">
+      <div class="node-label">⚠️ 登录验证失败</div>
+      <div class="node-sub">Verification Required</div>
+    </div>
+    <div id="s2-w2" class="rect-node glow-red cyber-panel" style="left:72%; top:45%; width:160px; color:#ff3366; border-color:#ff3366; opacity:0;">
+      <div class="node-label">⏱️ 请求超时</div>
+      <div class="node-sub">Request Timeout</div>
+    </div>
+    <div id="s2-w3" class="rect-node glow-red cyber-panel" style="left:34%; top:65%; width:160px; color:#ff3366; border-color:#ff3366; opacity:0;">
+      <div class="node-label">❌ 进程卡死</div>
+      <div class="node-sub">Agent Terminated</div>
+    </div>
+  </div>
+
+  <!-- ══ S3 AI Brain & Labels ══ -->
+  <div class="scene" id="s3">
+    <!-- concentric dashed spheres for AI Brain -->
+    <div id="s3-brain" style="position:relative; width:180px; height:180px; display:flex; align-items:center; justify-content:center;">
+      <svg width="180" height="180" viewBox="0 0 100 100" style="overflow:visible;">
+        <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(0,255,204,0.15)" stroke-width="1"></circle>
+        <circle id="s3-brain-ring1" cx="50" cy="50" r="42" fill="none" stroke="#00ffcc" stroke-width="1.5" stroke-dasharray="10 6" filter="drop-shadow(0 0 6px #00ffcc)"></circle>
+        <circle id="s3-brain-ring2" cx="50" cy="50" r="32" fill="none" stroke="#00ffcc" stroke-width="1.2" stroke-dasharray="6 4" filter="drop-shadow(0 0 4px #00ffcc)"></circle>
+        <circle cx="50" cy="50" r="12" fill="none" stroke="#00ffcc" stroke-width="2"></circle>
+        <path d="M50,15 L50,85 M15,50 L85,50 M25,25 L75,75 M25,75 L75,25" stroke="rgba(0,255,204,0.2)" stroke-width="0.8" stroke-dasharray="3 3"></path>
+      </svg>
+      <div style="position:absolute; font-size:12px; font-weight:700; color:#00ffcc; text-shadow:0 0 10px #00ffcc; text-align:center;">
+        AI Agent<br><span style="font-size:9px; opacity:0.6;">🧠 大脑</span>
+      </div>
+    </div>
+
+    <!-- Labels left/right -->
+    <div id="s3-lbl-left" class="rect-node cyber-panel" style="left:20%; top:50%; width:130px; border-color:#666; color:#888; opacity:0;">
+      <div class="node-label">Agent 脑力?</div>
+      <div class="node-sub">提示词不够好?</div>
+    </div>
+    <div id="s3-lbl-right" class="rect-node cyber-panel" style="left:80%; top:50%; width:130px; border-color:#666; color:#888; opacity:0;">
+      <div class="node-label">意图理解?</div>
+      <div class="node-sub">推理深度不够?</div>
+    </div>
+  </div>
+
+  <!-- ══ S4 Collision Brain vs Firewall ══ -->
+  <div class="scene" id="s4">
+    <!-- SVG explosion container -->
+    <svg id="s4-explosions" style="position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:5;"></svg>
+
+    <div id="s4-brain-node" class="node glow-cyan" style="left: 20%; top: 50%; width:110px; height:110px; border:2px solid #00ffcc; background:rgba(0,255,204,0.06); color:#00ffcc; z-index:2;">
+      <div class="node-label">AI Brain</div>
+      <div class="node-sub">思考与编排</div>
+    </div>
+
+    <div id="s4-firewall" class="node glow-red" style="left: 80%; top: 50%; width:115px; height:115px; border:2px solid #ff3366; background:rgba(255,51,102,0.06); color:#ff3366; z-index:2;">
+      <div class="node-label">🛡️ 防火墙</div>
+      <div class="node-sub">反自动化爬虫</div>
+    </div>
+
+    <!-- Shield pattern details -->
+    <div id="s4-firewall-bg" style="position:absolute; left:80%; top:50%; width:200px; height:200px; transform:translate(-50%,-50%); border-radius:50%; border:1px dashed rgba(255,51,102,0.25); pointer-events:none; z-index:1; opacity:0;"></div>
+  </div>
+
+  <!-- ══ S5 Server IP vs Firewall & Token Burn ══ -->
+  <div class="scene" id="s5">
+    <div id="s5-firewall" class="node glow-red" style="left: 60%; top: 45%; width:110px; height:110px; border:2px solid #ff3366; background:rgba(255,51,102,0.08); color:#ff3366; z-index:2;">
+      <div class="node-label">🛡️ 反爬平台</div>
+      <div class="node-sub">Cloudflare / CF</div>
+    </div>
+
+    <div id="s5-ip-dot" class="node glow-cyan" style="left: 20%; top: 45%; width:36px; height:36px; border:2px solid #00ffcc; background:#060919; color:#00ffcc; z-index:3;">
+      <div style="font-size:8px; font-weight:700;">IP</div>
+    </div>
+
+    <svg style="position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:1;">
+      <line id="s5-bounce-line" x1="20%" y1="45%" x2="60%" y2="45%" stroke="rgba(0,255,204,0.15)" stroke-width="1.5" stroke-dasharray="4 4"/>
+    </svg>
+
+    <!-- Token Counter card -->
+    <div id="s5-token-card" class="rect-node glow-red cyber-panel" style="left: 50%; top: 78%; width: 260px; color:#ff3366; border-color:#ff3366; opacity:0; z-index:3; animation: breathe-red 2s infinite;">
+      <div style="font-size:10px; color:rgba(255,51,102,0.5); letter-spacing:2px;">TOKEN COMBUSTION</div>
+      <div style="font-size:32px; font-weight:900; margin-top:5px; font-family:Courier New;" id="s5-token-num">00000</div>
+      <div style="font-size:10px; color:rgba(255,51,102,0.7); margin-top:2px;">Token 疯狂燃烧 / 代理无限死循环</div>
+    </div>
+  </div>
+
+  <!-- ══ S6 Waveform & CPU Progress ══ -->
+  <div class="scene" id="s6">
+    <!-- Waveform block -->
+    <div id="s6-wave-box" style="position:absolute; left:50%; top:30%; transform:translateX(-50%); width:80vw; max-width:560px; height:100px; display:flex; align-items:center; justify-content:center; opacity:0;">
+      <svg width="560" height="80" viewBox="0 0 560 80" style="overflow:visible;">
+        <path id="s6-wave-path" d="M0,40 Q15,10 30,40 T60,40 T90,40 T120,40 T150,40 T180,40 T210,40 T240,40 T270,40 T300,40 T330,40 T360,40 T390,40 T420,40 T450,40 T480,40 T510,40 T540,40 T560,40" fill="none" stroke="#ff9900" stroke-width="2" filter="drop-shadow(0 0 6px #ff9900)"></path>
+      </svg>
+      <div style="position:absolute; right:10px; top:10px; font-size:10px; color:#ff9900; letter-spacing:1px;">9-Min Audio (No Subtitle)</div>
+    </div>
+
+    <!-- CPU Progress bar -->
+    <div id="s6-cpu-panel" class="rect-node glow-red cyber-panel" style="left:50%; top:68%; width:440px; border-color:#ff3366; opacity:0;">
+      <div style="display:flex; justify-content:space-between; width:100%; font-size:11px; color:rgba(255,51,102,0.8); font-weight:700;">
+        <span>🔥 Local Whisper (CPU Conversion)</span>
+        <span id="s6-cpu-pct">0%</span>
+      </div>
+      <div style="height:8px; width:100%; background:rgba(255,51,102,0.1); border-radius:4px; margin-top:10px; overflow:hidden; border:1px solid rgba(255,51,102,0.25);">
+        <div id="s6-cpu-progress" style="height:100%; width:0%; background:linear-gradient(90deg,#ff9900,#ff3366); border-radius:4px;"></div>
+      </div>
+      <div style="font-size:9px; color:rgba(255,51,102,0.5); margin-top:6px; letter-spacing:1px; width:100%; text-align:left;">
+        SYS LOAD: MAX LOAD OVERHEAT WARNING // CPU 100%
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ S7 Server Crash ══ -->
+  <div class="scene" id="s7">
+    <!-- Exploded shards of CPU progress bar -->
+    <div id="s7-shards-box" style="position:absolute; inset:0; pointer-events:none; z-index:2;"></div>
+
+    <div id="s7-crash-card" class="rect-node glow-red cyber-panel" style="left:50%; top:50%; width:420px; border-color:#ff3366; background:rgba(255,51,102,0.05); text-align:center; opacity:0; z-index:3;">
+      <div style="font-size:24px; font-weight:900; color:#ff3366; letter-spacing:3px;">🚨 SYSTEM OVERLOADED</div>
+      <div style="font-size:12px; color:#ff9900; margin-top:8px; font-family:Courier New; font-weight:bold;">PROCESS TERMINATED (EXIT CODE 137)</div>
+      <div style="font-size:11px; color:rgba(255,255,255,0.6); margin-top:12px; border-top:1px dashed rgba(255,51,102,0.3); padding-top:10px; line-height:1.5;">
+        服务器满载瘫痪 30 分钟<br>
+        <span style="color:#ff3366; font-weight:bold;">“方向不对，努力白费”</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ S8 Decouple Laser Cut ══ -->
+  <div class="scene" id="s8">
+    <div id="s8-brain-node" class="node glow-cyan" style="left:22%; top:50%; width:110px; height:110px; border:2px solid #00ffcc; background:rgba(0,255,204,0.05); color:#00ffcc; opacity:0; z-index:2;">
+      <div class="node-label">思考大脑</div>
+      <div class="node-sub">Hermes Agent</div>
+    </div>
+
+    <div id="s8-crawler-node" class="node glow-gold" style="left:78%; top:50%; width:110px; height:110px; border:2px solid #ffd700; background:rgba(255,215,0,0.05); color:#ffd700; opacity:0; z-index:2;">
+      <div class="node-label">数据通道</div>
+      <div class="node-sub">Crawler / API</div>
+    </div>
+
+    <svg style="position:absolute; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; z-index:1;">
+      <!-- Connection dashed line -->
+      <path id="s8-connect-line" d="M22%,50% L78%,50%" stroke="#00ffcc" stroke-width="2" stroke-dasharray="6 4" opacity="0"/>
+    </svg>
+
+    <!-- Laser Sword SVG -->
+    <div id="s8-laser-sword" style="position:absolute; left:50%; top:10%; width:40px; height:240px; transform-origin: center top; transform: rotate(-45deg); opacity:0; z-index:4; pointer-events:none;">
+      <svg width="40" height="240" viewBox="0 0 40 240">
+        <line x1="20" y1="10" x2="20" y2="230" stroke="#ffd700" stroke-width="6" stroke-linecap="round" filter="drop-shadow(0 0 10px #ffd700)"></line>
+        <line x1="20" y1="10" x2="20" y2="230" stroke="#ffffff" stroke-width="2" stroke-linecap="round"></line>
+        <rect x="15" y="210" width="10" height="25" fill="#555" rx="2"></rect>
+      </svg>
+    </div>
+
+    <!-- Sparks Container -->
+    <svg id="s8-sparks" style="position:absolute; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; z-index:5;"></svg>
+  </div>
+
+  <!-- ══ S9 Pipeline Reconstructed ══ -->
+  <div class="scene" id="s9">
+    <div id="s9-hermes" class="node glow-cyan" style="left:24%; top:45%; width:120px; height:120px; border:2px solid #00ffcc; background:rgba(0,255,204,0.06); color:#00ffcc; opacity:0; z-index:2;">
+      <div class="node-label">★ Hermes 大脑</div>
+      <div class="node-sub">只做调度决策</div>
+    </div>
+
+    <div id="s9-supdata" class="node glow-gold" style="left:76%; top:45%; width:120px; height:120px; border:2px solid #ffd700; background:rgba(255,215,0,0.06); color:#ffd700; opacity:0; z-index:2;">
+      <div class="node-label">Supdata API</div>
+      <div class="node-sub">高速数据通道</div>
+    </div>
+
+    <svg style="position:absolute; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; z-index:1;">
+      <!-- Pipeline path -->
+      <path id="s9-pipe" d="M76%,45% L24%,45%" stroke="rgba(0,255,204,0.15)" stroke-width="6" stroke-linecap="round" fill="none" opacity="0"/>
+      <path id="s9-pipe-glow" d="M76%,45% L24%,45%" stroke="#00ffcc" stroke-width="2" stroke-dasharray="150" stroke-dashoffset="150" stroke-linecap="round" fill="none" opacity="0" filter="drop-shadow(0 0 6px #00ffcc)"/>
+      
+      <!-- Flowing packets -->
+      <g id="s9-packets" opacity="0">
+        <circle r="5" fill="#39ff14" filter="drop-shadow(0 0 6px #39ff14)">
+          <animateMotion dur="1.8s" repeatCount="indefinite" path="M76%,45% L24%,45%" keyTimes="0;1"/>
+        </circle>
+        <circle r="4" fill="#00ffcc" filter="drop-shadow(0 0 6px #00ffcc)">
+          <animateMotion dur="1.8s" begin="0.6s" repeatCount="indefinite" path="M76%,45% L24%,45%" keyTimes="0;1"/>
+        </circle>
+        <circle r="4" fill="#ffd700" filter="drop-shadow(0 0 6px #ffd700)">
+          <animateMotion dur="1.8s" begin="1.2s" repeatCount="indefinite" path="M76%,45% L24%,45%" keyTimes="0;1"/>
+        </circle>
+      </g>
+    </svg>
+  </div>
+
+  <!-- ══ S10 Three Step Cards ══ -->
+  <div class="scene" id="s10">
+    <div style="display:flex; justify-content:space-between; align-items:center; width:90vw; max-width:760px; height:240px; position:relative; z-index:2;">
+      <!-- Step 1 -->
+      <div id="s10-c1" class="rect-node glow-cyan cyber-panel" style="position:relative; transform:none; left:auto; top:auto; width:220px; height:150px; border-color:#00ffcc; opacity:0;">
+        <div style="font-size:10px; color:rgba(0,255,204,0.45); letter-spacing:1px; margin-bottom:5px;">STEP 01 // 筛选</div>
+        <div class="node-label" style="color:#00ffcc;">1. 元数据聚类</div>
+        <div class="node-sub" style="color:rgba(255,255,255,0.7); text-align:left; margin-top:8px; line-height:1.5;">
+          • 轻量抓取标题/播放/点赞<br>
+          • 按主题在本地做聚类
+        </div>
+      </div>
+
+      <!-- Connector 1 -->
+      <div id="s10-l1" style="width:30px; height:2px; background:rgba(0,255,204,0.15); position:relative; overflow:hidden; opacity:0;">
+        <div id="s10-l1-glow" style="width:100%; height:100%; background:#00ffcc; transform:translateX(-100%);"></div>
+      </div>
+
+      <!-- Step 2 -->
+      <div id="s10-c2" class="rect-node glow-gold cyber-panel" style="position:relative; transform:none; left:auto; top:auto; width:220px; height:150px; border-color:#ffd700; opacity:0;">
+        <div style="font-size:10px; color:rgba(255,215,0,0.45); letter-spacing:1px; margin-bottom:5px;">STEP 02 // 过滤</div>
+        <div class="node-label" style="color:#ffd700;">2. 人工锁定</div>
+        <div class="node-sub" style="color:rgba(255,255,255,0.7); text-align:left; margin-top:8px; line-height:1.5;">
+          • 挑选数据最好视频<br>
+          • 锁定 3-5 个高价值对标
+        </div>
+      </div>
+
+      <!-- Connector 2 -->
+      <div id="s10-l2" style="width:30px; height:2px; background:rgba(0,255,204,0.15); position:relative; overflow:hidden; opacity:0;">
+        <div id="s10-l2-glow" style="width:100%; height:100%; background:#00ffcc; transform:translateX(-100%);"></div>
+      </div>
+
+      <!-- Step 3 -->
+      <div id="s10-c3" class="rect-node glow-green cyber-panel" style="position:relative; transform:none; left:auto; top:auto; width:220px; height:150px; border-color:#39ff14; opacity:0;">
+        <div style="font-size:10px; color:rgba(57,255,20,0.45); letter-spacing:1px; margin-bottom:5px;">STEP 03 // 提取</div>
+        <div class="node-label" style="color:#39ff14;">3. Supdata 秒提</div>
+        <div class="node-sub" style="color:rgba(255,255,255,0.7); text-align:left; margin-top:8px; line-height:1.5;">
+          • 打包调用 API 获取数据<br>
+          • 秒级吐出干净中英逐字稿
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ S11 Output & Obsidian Sync & Token Reduced ══ -->
+  <div class="scene" id="s11">
+    <div id="s11-script" class="rect-node glow-cyan cyber-panel" style="left:26%; top:35%; width:180px; border-color:#00ffcc; opacity:0; z-index:2;">
+      <div class="node-label" style="color:#00ffcc;">📝 干净口播稿</div>
+      <div class="node-sub">已翻译/已结构化拆解</div>
+    </div>
+
+    <!-- Obsidian Cube -->
+    <div id="s11-obsidian" style="position:absolute; left:74%; top:35%; transform:translate(-50%,-50%); width:120px; height:120px; opacity:0; z-index:2; perspective: 400px;">
+      <div id="s11-cube" style="width:100%; height:100%; position:relative; transform-style:preserve-3d;">
+        <!-- faces -->
+        <div style="position:absolute; width:60px; height:60px; left:30px; top:30px; border:2px solid #aa00ff; background:rgba(170,0,255,0.15); transform: rotateY(0deg) translateZ(30px); display:flex; align-items:center; justify-content:center; font-size:16px;">🔮</div>
+        <div style="position:absolute; width:60px; height:60px; left:30px; top:30px; border:2px solid #aa00ff; background:rgba(170,0,255,0.15); transform: rotateY(90deg) translateZ(30px);"></div>
+        <div style="position:absolute; width:60px; height:60px; left:30px; top:30px; border:2px solid #aa00ff; background:rgba(170,0,255,0.15); transform: rotateY(180deg) translateZ(30px);"></div>
+        <div style="position:absolute; width:60px; height:60px; left:30px; top:30px; border:2px solid #aa00ff; background:rgba(170,0,255,0.15); transform: rotateY(270deg) translateZ(30px);"></div>
+        <div style="position:absolute; width:60px; height:60px; left:30px; top:30px; border:2px solid #aa00ff; background:rgba(170,0,255,0.15); transform: rotateX(90deg) translateZ(30px);"></div>
+        <div style="position:absolute; width:60px; height:60px; left:30px; top:30px; border:2px solid #aa00ff; background:rgba(170,0,255,0.15); transform: rotateX(-90deg) translateZ(30px);"></div>
+      </div>
+      <div style="position:absolute; bottom:-10px; width:100%; text-align:center; font-size:10px; color:#aa00ff; font-weight:bold;">Obsidian 笔记库</div>
+    </div>
+
+    <svg style="position:absolute; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; z-index:1;">
+      <!-- Connection line -->
+      <path id="s11-line" d="M26%,35% L74%,35%" stroke="#00ffcc" stroke-width="2" stroke-dasharray="5 5" opacity="0"/>
+    </svg>
+
+    <!-- Token reduction panel -->
+    <div id="s11-token-panel" class="rect-node glow-green cyber-panel" style="left:50%; top:70%; width:340px; border-color:#39ff14; text-align:center; opacity:0; z-index:3;">
+      <div style="font-size:10px; color:rgba(57,255,20,0.5); letter-spacing:2px;">TOKEN CONSUMPTION SAVED</div>
+      <div style="display:flex; justify-content:center; align-items:baseline; gap:10px; margin-top:5px;">
+        <span style="font-size:28px; font-weight:900; color:#39ff14;" id="s11-token-pct">100%</span>
+        <span style="font-size:18px; color:#39ff14;">➔</span>
+        <span style="font-size:32px; font-weight:900; color:#ffd700; text-shadow:0 0 10px #ffd700;" id="s11-token-pct-final">20%</span>
+      </div>
+      <div style="font-size:13px; font-weight:700; color:#ffd700; margin-top:5px;" id="s11-save-badge">Token 消耗降低 80% / 3分钟跑通</div>
+    </div>
+  </div>
+
+  <!-- ══ S12 CTA & Gift Card ══ -->
+  <div class="scene" id="s12" style="flex-direction:column; gap:20px;">
+    <!-- SVG coins container -->
+    <svg id="s12-coins" style="position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:1;"></svg>
+
+    <div id="s12-title" style="font-size:clamp(20px,5vw,36px); font-weight:900; color:#ffd700; text-shadow:0 0 15px rgba(255,215,0,0.4); text-align:center; opacity:0; z-index:2; line-height:1.4;">
+      不要让 Agent 硬爬，让 Agent 调度。
+    </div>
+
+    <!-- Gift card -->
+    <div id="s12-gift-card" class="rect-node glow-cyan cyber-panel" style="position:relative; transform:none; left:auto; top:auto; width:340px; height:130px; border-color:#00ffcc; opacity:0; z-index:2; text-align:center; margin-top:10px;">
+      <div style="font-size:11px; color:rgba(0,255,204,0.6); letter-spacing:2px; margin-bottom:5px;">🎁 AUTOMATION TOOLKIT</div>
+      <div style="font-size:18px; font-weight:900; color:#fff; letter-spacing:1px;">《逐字稿完整工作流》礼包</div>
+      <div style="font-size:11px; color:#00ffcc; margin-top:8px; line-height:1.5;">
+        配置与 Hermes 指令已就绪<br>
+        在评论区打“<span style="font-weight:bold; text-decoration:underline;">逐字稿</span>”一键获取
+      </div>
+    </div>
+  </div>
+
+</div><!-- /#stage end -->
+
+<div id="progress-wrap">
+  <div id="prog-bar-bg"><div id="prog-bar"></div></div>
+  <div id="prog-info"><span id="prog-scene">1 / 12</span><span id="prog-time">0s</span></div>
+</div>
+<div id="key-hint">SPACE 暂停 · → 下一幕 · ← 上一幕</div>
+
+<script>
+// 12幕剧本配置 (基于口播稿 v1.1)
+const scenes = [
+  { id: 1, dur: 4.0, text: "你有没有遇到过这种情况？" },
+  { id: 2, dur: 4.0, text: "兴冲冲地把一个 YouTube 链接丢给 AI Agent，指望它能一键吐出逐字稿，再帮我们改成中文口播。" },
+  { id: 3, dur: 5.0, text: "结果等了半个多小时，页面还在转圈，最后直接报错弹出一句：登录验证失败、请求超时，或者干脆卡死！" },
+  { id: 4, dur: 6.0, text: "为什么会这样？很多人以为是 Agent 脑子不够用，或者提示词写得不够好。" },
+  { id: 5, dur: 8.0, text: "但我们踩完坑才发现，真正的问题是：我们让一个负责思考和编排任务的大脑，去硬刚一个专门防自动化爬虫的平台。" },
+  { id: 6, dur: 9.0, text: "我们用普通的云服务器 IP 去硬爬，没有真实登录态，结果就是 Agent 不断在换代理、验证码和死循环里打转，Token 疯狂燃烧，服务器直接卡死！" },
+  { id: 7, dur: 5.0, text: "最离谱的一次，是一个没有公开字幕的九分钟视频。" },
+  { id: 8, dur: 5.0, text: "Agent 为了拿到逐字稿，竟然默默地把整个音频下到我们本地，然后调用本地 Whisper 用 CPU 硬转！" },
+  { id: 9, dur: 8.0, text: "虽然最后转出来了，但整台服务器满载直接瘫痪了半小时。这直接验证了那一句话：方向不对，努力白费。" },
+  { id: 10, dur: 8.0, text: "我们把“获取数据”和“理解数据”混成了一件事，这根本行不通！真正的解决方案是：把这两件事彻底解耦。" },
+  { id: 11, dur: 8.0, text: "Agent 应该只负责“理解、筛选、加工”，而把“抓取、绕过反爬”这个最脏最累的活，交出去。" },
+  { id: 12, dur: 11.0, text: "所以我们把流水线重构了：让 Hermes 做大脑，让 Supdata API 负责数据入口。不让 Agent 去模拟浏览器，而是直接调度专门的 API。" },
+  { id: 13, dur: 6.0, text: "逻辑非常简单，一共分三步：" },
+  { id: 14, dur: 8.0, text: "第一步，别一上来就抓逐字稿。先让 Hermes 做轻量的元数据检索，拉取标题、播放量、点赞，按主题做个聚类。" },
+  { id: 15, dur: 7.0, text: "第二步，我们在聚类结果里挑出数据最好、最值得做的 3 到 5 个视频。" },
+  { id: 16, dur: 10.0, text: "第三步，把链接打包，直接调用 Supdata API。它会自动绕过反爬，秒级吐出中英对照的干净逐字稿。" },
+  { id: 17, dur: 8.0, text: "最后，Hermes 重新接手，做翻译、结构拆解、提炼爆点，一键生成口播稿并写入我们的 Obsidian。" },
+  { id: 18, dur: 11.0, text: "这样一拆，原来要卡死半小时的流程，现在 3 分钟内全部跑通，而且 Token 消耗降低了 80%，服务器平稳运行。" },
+  { id: 19, dur: 7.0, text: "记住一句话：不要让 Agent 硬爬，让 Agent 调度。" },
+  { id: 20, dur: 11.0, text: "如果我们也想把自媒体流水线做成自动化，避开这些爬虫深坑，评论区打“逐字稿”，我们把这套完整的 Hermes 指令和 Supdata 配置文件发给你！" }
+];
+
+const totalDur = scenes.reduce((a, b) => a + b.dur, 0);
+let currentIdx = -1;
+let mainTl = null;
+
+// DOM
+const hudNum = document.getElementById('scene-num');
+const hudText = document.getElementById('hud-text');
+const progBar = document.getElementById('prog-bar');
+const progScene = document.getElementById('prog-scene');
+const progTime = document.getElementById('prog-time');
+const bgRedGlow = document.getElementById('bg-red-glow');
+
+// 初始化 GSAP
+
+function getVisualNumForScene(num) {
+  const mapping = {
+    1: 1,
+    2: 1,
+    3: 2,
+    4: 3,
+    5: 4,
+    6: 5,
+    7: 6,
+    8: 6,
+    9: 7,
+    10: 8,
+    11: 8,
+    12: 9,
+    13: 10,
+    14: 10,
+    15: 10,
+    16: 10,
+    17: 11,
+    18: 11,
+    19: 12,
+    20: 12
+  };
+  return mapping[num] || 1;
+}
+
+function buildDirectorTimeline() {
+  mainTl = gsap.timeline({
+    onUpdate: () => {
+      const time = mainTl.time();
+      const pct = (time / totalDur) * 100;
+      progBar.style.width = pct + '%';
+      progTime.innerText = Math.floor(time) + 's / ' + Math.floor(totalDur) + 's';
+    }
+  });
+
+  let t = 0;
+  scenes.forEach((sc, i) => {
+    // 切换 HUD 字幕
+    mainTl.call(() => {
+      currentIdx = i;
+      hudNum.innerText = i + 1;
+      hudText.innerText = sc.text;
+      progScene.innerText = (i + 1) + ' / ' + scenes.length;
+      
+      // 处理手机端字幕纵向自动平滑滚动
+      const clipH = document.getElementById('hud-clip').clientHeight;
+      const textH = hudText.scrollHeight;
+      const overflow = textH - clipH;
+      gsap.killTweensOf(hudText);
+      gsap.set(hudText, { y: 0 });
+      if (overflow > 2) {
+        gsap.to(hudText, {
+          y: -overflow,
+          duration: sc.dur * 0.85,
+          ease: 'power1.inOut',
+          delay: sc.dur * 0.1
+        });
+      }
+
+      // 场景显隐控制
+      document.querySelectorAll('.scene').forEach((el, idx) => {
+        if (idx === i) {
+          el.classList.add('active');
+          gsap.to(el, { opacity: 1, duration: 0.4 });
+        } else {
+          el.classList.remove('active');
+          gsap.to(el, { opacity: 0, duration: 0.3 });
+        }
+      });
+
+      // 针对各 Scene 触发动画分镜
+      const visualNum = getVisualNumForScene(i + 1);
+      playSceneAnimation(visualNum, sc.dur);
+    }, null, t);
+
+    t += sc.dur;
+  });
+
+  // 暴露给 window.mainTl 供 Hyperframes 控制
+  window.mainTl = mainTl;
+}
+
+// 统一保存定时器引用，在 playSceneAnimation 开始时做物理销毁以防切换场景残留
+let sceneTimers = [];
+function clearSceneTimers() {
+  sceneTimers.forEach(timer => clearTimeout(timer));
+  sceneTimers = [];
+}
+
+// 各场景的具体动效逻辑
+function playSceneAnimation(num, dur) {
+  clearSceneTimers();
+  // 销毁无限循环补间以消除残留
+  gsap.killTweensOf('*');
+  bgRedGlow.style.opacity = 0;
+
+  if (num === 1) {
+    gsap.set('#s1-yt-path', { strokeDasharray: 350, strokeDashoffset: 350 });
+    gsap.set('#s1-yt-play', { opacity: 0, scale: 0.8, transformOrigin: 'center' });
+    gsap.set('#s1-sub', { opacity: 0, y: 15 });
+
+    gsap.to('#s1-yt-path', { strokeDashoffset: 0, duration: 1.2, ease: 'power2.inOut' });
+    gsap.to('#s1-yt-play', { opacity: 1, scale: 1, duration: 0.6, delay: 0.8, ease: 'back.out(1.5)' });
+    gsap.to('#s1-sub', { opacity: 0.7, y: 0, duration: 0.6, delay: 1.0 });
+
+    // YouTube logo breathe glow
+    gsap.to('#s1-logo-container', { scale: 1.08, duration: 1.5, repeat: -1, yoyo: true, ease: 'sine.inOut', delay: 1.2 });
+  } 
+  else if (num === 2) {
+    // Glitch抖动 & 弹出红牌
+    gsap.set(['#s2-w1', '#s2-w2', '#s2-w3'], { scale: 0.5, opacity: 0 });
+    gsap.set('#s2-logo', { x: 0, y: 0, opacity: 1, scale: 1 });
+    document.getElementById('s2-shards').style.display = 'none';
+
+    // Logo shake glitch
+    gsap.to('#s2-logo', {
+      x: () => (Math.random() - 0.5) * 12,
+      y: () => (Math.random() - 0.5) * 12,
+      duration: 0.05,
+      repeat: -1,
+      yoyo: true
+    });
+
+    // Stagger warning cards
+    gsap.to('#s2-w1', { scale: 1, opacity: 1, duration: 0.6, delay: 0.3, ease: 'elastic.out(1,0.5)' });
+    gsap.to('#s2-w2', { scale: 1, opacity: 1, duration: 0.6, delay: 0.7, ease: 'elastic.out(1,0.5)' });
+    gsap.to('#s2-w3', { scale: 1, opacity: 1, duration: 0.6, delay: 1.1, ease: 'elastic.out(1,0.5)' });
+
+    // Background red alert breathing
+    bgRedGlow.style.opacity = 0.5;
+    gsap.to(bgRedGlow, { opacity: 0.8, duration: 0.8, repeat: -1, yoyo: true, ease: 'sine.inOut' });
+
+    // Shatter near the end of scene (4.2s)
+    const shatterTimer = setTimeout(() => {
+      gsap.killTweensOf('#s2-logo');
+      gsap.set('#s2-logo', { opacity: 0 });
+      document.getElementById('s2-shards').style.display = 'block';
+
+      // Shatter sparks
+      const angles = [30, 90, 150, 210, 270, 330];
+      const dists = [70, 90, 80, 75, 85, 95];
+      document.querySelectorAll('.s2-shard').forEach((shard, idx) => {
+        const rad = (angles[idx] * Math.PI) / 180;
+        const tx = Math.cos(rad) * dists[idx];
+        const ty = Math.sin(rad) * dists[idx];
+        gsap.fromTo(shard, 
+          { x: 0, y: 0, opacity: 1, scale: 1, rotation: 0 },
+          { x: tx, y: ty, opacity: 0, scale: 0.2, rotation: 270, duration: 0.8, ease: 'power3.out' }
+        );
+      });
+    }, 4200);
+    sceneTimers.push(shatterTimer);
+  }
+  else if (num === 3) {
+    // AI Brain and label inputs
+    gsap.set('#s3-brain', { scale: 0.4, opacity: 0 });
+    gsap.set(['#s3-lbl-left', '#s3-lbl-right'], { x: 0, opacity: 0 });
+
+    // Rotate concentric rings
+    gsap.to('#s3-brain-ring1', { rotation: 360, transformOrigin: '50px 50px', duration: 12, repeat: -1, ease: 'none' });
+    gsap.to('#s3-brain-ring2', { rotation: -360, transformOrigin: '50px 50px', duration: 8, repeat: -1, ease: 'none' });
+
+    gsap.to('#s3-brain', { scale: 1, opacity: 1, duration: 0.8, ease: 'back.out(1.5)' });
+    gsap.to('#s3-lbl-left', { x: 20, opacity: 1, duration: 0.6, delay: 0.5, ease: 'power4.out' });
+    gsap.to('#s3-lbl-right', { x: -20, opacity: 1, duration: 0.6, delay: 0.8, ease: 'power4.out' });
+  }
+  else if (num === 4) {
+    // Collision Brain vs Firewall
+    gsap.set('#s4-brain-node', { x: -200, opacity: 0, scale: 0.8 });
+    gsap.set('#s4-firewall', { x: 200, opacity: 0, scale: 0.8 });
+    gsap.set('#s4-firewall-bg', { scale: 0.5, opacity: 0 });
+
+    // Spawn nodes
+    gsap.to('#s4-brain-node', { x: -60, opacity: 1, scale: 1, duration: 0.8, ease: 'power3.out' });
+    gsap.to('#s4-firewall', { x: 60, opacity: 1, scale: 1, duration: 0.8, ease: 'power3.out' });
+    gsap.to('#s4-firewall-bg', { scale: 1, opacity: 1, duration: 1.0, delay: 0.4 });
+
+    // Collision at 1.8s
+    const collisionTimer = setTimeout(() => {
+      // Impact shake
+      gsap.to(['#s4-brain-node', '#s4-firewall'], {
+        x: (i) => i === 0 ? -70 : 70,
+        duration: 0.05,
+        repeat: 5,
+        yoyo: true
+      });
+
+      // Explosion particles in SVG
+      const container = document.getElementById('s4-explosions');
+      container.innerHTML = '';
+      const particleCount = 40;
+      for (let p = 0; p < particleCount; p++) {
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', '50%');
+        circle.setAttribute('cy', '50%');
+        circle.setAttribute('r', Math.random() * 5 + 2);
+        circle.setAttribute('fill', Math.random() > 0.5 ? '#ff3366' : '#00ffcc');
+        container.appendChild(circle);
+
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 160 + 40;
+        const tx = Math.cos(angle) * speed;
+        const ty = Math.sin(angle) * speed;
+
+        gsap.to(circle, {
+          x: tx,
+          y: ty,
+          opacity: 0,
+          scale: 0.1,
+          duration: 0.8 + Math.random() * 0.4,
+          ease: 'power2.out'
+        });
+      }
+
+      // Flash background white briefly
+      gsap.fromTo(bgRedGlow, { opacity: 0.9 }, { opacity: 0, duration: 0.4 });
+    }, 1800);
+    sceneTimers.push(collisionTimer);
+  }
+  else if (num === 5) {
+    // Bouncing IP Dot & Token Burn
+    gsap.set('#s5-firewall', { opacity: 0, scale: 0.6 });
+    gsap.set('#s5-ip-dot', { opacity: 0, scale: 0.6 });
+    gsap.set('#s5-token-card', { opacity: 0, y: 30 });
+    document.getElementById('s5-token-num').innerText = '00000';
+
+    gsap.to('#s5-firewall', { opacity: 1, scale: 1, duration: 0.6, ease: 'back.out(1.5)' });
+    gsap.to('#s5-ip-dot', { opacity: 1, scale: 1, duration: 0.6, delay: 0.3 });
+
+    // Repeated Bounce IP to Firewall
+    const bounceTl = gsap.timeline({ repeat: -1 });
+    bounceTl.fromTo('#s5-ip-dot', { x: 0 }, { x: 300, duration: 0.5, ease: 'sine.in' })
+            .to('#s5-ip-dot', { x: 0, duration: 0.6, ease: 'power2.out' });
+
+    // Token Card
+    gsap.to('#s5-token-card', { opacity: 1, y: 0, duration: 0.6, delay: 0.8 });
+    // Count up Token
+    gsap.to({ val: 0 }, {
+      val: 99999,
+      duration: dur * 0.8,
+      delay: 0.9,
+      ease: 'power3.in',
+      onUpdate: function() {
+        const num = Math.ceil(this.targets()[0].val);
+        document.getElementById('s5-token-num').innerText = String(num).padStart(5, '0');
+      }
+    });
+
+    // Alarm bg glow
+    bgRedGlow.style.opacity = 0.4;
+    gsap.to(bgRedGlow, { opacity: 0.7, duration: 0.5, repeat: -1, yoyo: true });
+  }
+  else if (num === 6) {
+    // Waveform & CPU Load
+    gsap.set('#s6-wave-box', { opacity: 0, y: -20 });
+    gsap.set('#s6-cpu-panel', { opacity: 0, y: 20 });
+    gsap.set('#s6-cpu-progress', { width: '0%' });
+    document.getElementById('s6-cpu-pct').innerText = '0%';
+
+    gsap.to('#s6-wave-box', { opacity: 1, y: 0, duration: 0.6 });
+    gsap.to('#s6-cpu-panel', { opacity: 1, y: 0, duration: 0.6, delay: 0.4 });
+
+    // Animate wave path stroke-dashoffset
+    gsap.to('#s6-wave-path', { strokeDashoffset: 560, duration: 10, repeat: -1, ease: 'none' });
+
+    // CPU Bar from 0% to 100%
+    gsap.to('#s6-cpu-progress', { width: '100%', duration: dur * 0.8, delay: 0.5, ease: 'power2.in' });
+    gsap.to({ pct: 0 }, {
+      pct: 100,
+      duration: dur * 0.8,
+      delay: 0.5,
+      ease: 'power2.in',
+      onUpdate: function() {
+        const p = Math.ceil(this.targets()[0].pct);
+        document.getElementById('s6-cpu-pct').innerText = p + '%';
+        if (p > 85) {
+          // Add shaking near 90%
+          gsap.set('#s6-cpu-panel', {
+            x: (Math.random() - 0.5) * 4,
+            y: (Math.random() - 0.5) * 4
+          });
+        }
+      },
+      onComplete: () => {
+        gsap.set('#s6-cpu-panel', { x:0, y:0 });
+      }
+    });
+  }
+  else if (num === 7) {
+    // Crash Explosion
+    gsap.set('#s7-crash-card', { opacity: 0, scale: 0.8 });
+    const shardsBox = document.getElementById('s7-shards-box');
+    shardsBox.innerHTML = '';
+
+    // Create 15 red progress bar fragments
+    const fragmentCount = 15;
+    for (let f = 0; f < fragmentCount; f++) {
+      const shard = document.createElement('div');
+      shard.style.position = 'absolute';
+      shard.style.width = (Math.random() * 20 + 8) + 'px';
+      shard.style.height = '8px';
+      shard.style.background = '#ff3366';
+      shard.style.borderRadius = '2px';
+      shard.style.boxShadow = '0 0 8px #ff3366';
+      // Center range
+      shard.style.left = (window.innerWidth / 2 - 200 + Math.random() * 400) + 'px';
+      shard.style.top = '68%';
+      shardsBox.appendChild(shard);
+
+      const vx = (Math.random() - 0.5) * 300;
+      const vy = -Math.random() * 150 - 50; // initial jump up
+      gsap.to(shard, {
+        x: vx,
+        y: vy + 300, // fall down
+        opacity: 0,
+        rotation: Math.random() * 360,
+        duration: 1.2 + Math.random() * 0.6,
+        ease: 'power2.out'
+      });
+    }
+
+    // System overload card slides up & glitched blink
+    gsap.to('#s7-crash-card', { opacity: 1, scale: 1, duration: 0.5, ease: 'back.out(1.5)' });
+    // Glitch effect: repeat: 5, yoyo: true opacity
+    gsap.fromTo('#s7-crash-card', { opacity: 0.3 }, { opacity: 1, duration: 0.05, repeat: 7, yoyo: true, delay: 0.6 });
+
+    // Flash background red
+    bgRedGlow.style.opacity = 0.8;
+    gsap.to(bgRedGlow, { opacity: 0, duration: 0.8 });
+  }
+  else if (num === 8) {
+    // Decouple Cut
+    gsap.set('#s8-brain-node', { opacity: 0, x: -80 });
+    gsap.set('#s8-crawler-node', { opacity: 0, x: 80 });
+    gsap.set('#s8-connect-line', { opacity: 0, strokeDasharray: '6, 4', strokeDashoffset: 0 });
+    gsap.set('#s8-laser-sword', { opacity: 0, scale: 0.5, rotation: -45, y: -200, left: '50%', transformOrigin: 'center top' });
+    document.getElementById('s8-sparks').innerHTML = '';
+
+    gsap.to('#s8-brain-node', { opacity: 1, x: 0, duration: 0.6, ease: 'power2.out' });
+    gsap.to('#s8-crawler-node', { opacity: 1, x: 0, duration: 0.6, ease: 'power2.out' });
+    gsap.to('#s8-connect-line', { opacity: 0.6, duration: 0.4, delay: 0.4 });
+
+    // Laser Sword drop
+    gsap.to('#s8-laser-sword', { opacity: 1, y: 0, scale: 1, duration: 0.6, delay: 0.8, ease: 'back.out(1.2)' });
+    // Cut stroke
+    gsap.to('#s8-laser-sword', { rotation: 45, duration: 0.4, delay: 1.4, ease: 'power3.in', onComplete: () => {
+      // Sword impact sparks
+      const sparksSvg = document.getElementById('s8-sparks');
+      for (let p = 0; p < 25; p++) {
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', '50%');
+        circle.setAttribute('cy', '50%');
+        circle.setAttribute('r', Math.random() * 3 + 1);
+        circle.setAttribute('fill', '#ffd700');
+        circle.setAttribute('filter', 'drop-shadow(0 0 3px #ffd700)');
+        sparksSvg.appendChild(circle);
+
+        const angle = (Math.random() - 0.5) * Math.PI + Math.PI/2; // spark out downwards
+        const speed = Math.random() * 120 + 30;
+        gsap.to(circle, {
+          x: Math.cos(angle) * speed,
+          y: Math.sin(angle) * speed,
+          opacity: 0,
+          duration: 0.6 + Math.random() * 0.4
+        });
+      }
+
+      // Connection Line cut: pull back ends
+      gsap.to('#s8-connect-line', { opacity: 0, duration: 0.3 });
+      
+      // Pull nodes away
+      gsap.to('#s8-brain-node', { x: -60, duration: 0.6, ease: 'power2.out' });
+      gsap.to('#s8-crawler-node', { x: 60, duration: 0.6, ease: 'power2.out' });
+    }});
+
+    // Exit sword
+    gsap.to('#s8-laser-sword', { opacity: 0, y: 200, duration: 0.5, delay: 2.2 });
+  }
+  else if (num === 9) {
+    // Pipeline reconstructed
+    gsap.set('#s9-hermes', { opacity: 0, scale: 0.5 });
+    gsap.set('#s9-supdata', { opacity: 0, scale: 0.5 });
+    gsap.set('#s9-pipe', { opacity: 0 });
+    gsap.set('#s9-pipe-glow', { opacity: 0, strokeDashoffset: 150 });
+    gsap.set('#s9-packets', { opacity: 0 });
+
+    gsap.to('#s9-hermes', { opacity: 1, scale: 1, duration: 0.6, ease: 'elastic.out(1,0.5)' });
+    gsap.to('#s9-supdata', { opacity: 1, scale: 1, duration: 0.6, delay: 0.2, ease: 'elastic.out(1,0.5)' });
+    
+    // Draw pipe
+    gsap.to('#s9-pipe', { opacity: 0.2, duration: 0.4, delay: 0.6 });
+    gsap.to('#s9-pipe-glow', { opacity: 1, strokeDashoffset: 0, duration: 0.8, delay: 0.7, ease: 'power2.inOut', onComplete: () => {
+      gsap.to('#s9-packets', { opacity: 1, duration: 0.3 });
+    }});
+  }
+  else if (num === 10) {
+    // 3 Step Cards sequentially slide in
+    gsap.set(['#s10-c1', '#s10-c2', '#s10-c3'], { y: 60, opacity: 0, scale: 0.95 });
+    gsap.set(['#s10-l1', '#s10-l2'], { opacity: 0 });
+    gsap.set(['#s10-l1-glow', '#s10-l2-glow'], { x: '-100%' });
+
+    gsap.to('#s10-c1', { y: 0, opacity: 1, scale: 1, duration: 0.6, ease: 'power3.out' });
+    gsap.to('#s10-l1', { opacity: 1, duration: 0.2, delay: 0.5 });
+    gsap.to('#s10-l1-glow', { x: '0%', duration: 0.4, delay: 0.6, ease: 'power2.out' });
+
+    gsap.to('#s10-c2', { y: 0, opacity: 1, scale: 1, duration: 0.6, delay: 0.9, ease: 'power3.out' });
+    gsap.to('#s10-l2', { opacity: 1, duration: 0.2, delay: 1.4 });
+    gsap.to('#s10-l2-glow', { x: '0%', duration: 0.4, delay: 1.5, ease: 'power2.out' });
+
+    gsap.to('#s10-c3', { y: 0, opacity: 1, scale: 1, duration: 0.6, delay: 1.8, ease: 'power3.out' });
+  }
+  else if (num === 11) {
+    // Output script to Obsidian
+    gsap.set('#s11-script', { opacity: 0, scale: 0.6, x: -50 });
+    gsap.set('#s11-obsidian', { opacity: 0, scale: 0.6, x: 50 });
+    gsap.set('#s11-line', { opacity: 0 });
+    gsap.set('#s11-token-panel', { opacity: 0, y: 40 });
+    document.getElementById('s11-token-pct').innerText = '100%';
+    document.getElementById('s11-token-pct-final').style.opacity = '0';
+    document.getElementById('s11-save-badge').style.opacity = '0';
+
+    gsap.to('#s11-script', { opacity: 1, scale: 1, x: 0, duration: 0.6, ease: 'back.out(1.5)' });
+    gsap.to('#s11-obsidian', { opacity: 1, scale: 1, x: 0, duration: 0.6, delay: 0.2, ease: 'back.out(1.5)' });
+
+    // Rotate Obsidian cube
+    gsap.to('#s11-cube', { rotationY: 360, rotationX: 45, duration: 15, repeat: -1, ease: 'none' });
+
+    // Link pulses
+    gsap.to('#s11-line', { opacity: 0.6, duration: 0.4, delay: 0.6 });
+
+    // Token Reduction panel
+    gsap.to('#s11-token-panel', { opacity: 1, y: 0, duration: 0.6, delay: 1.0 });
+    
+    // Count down to 20%
+    gsap.to({ val: 100 }, {
+      val: 20,
+      duration: 1.8,
+      delay: 1.4,
+      ease: 'power3.out',
+      onUpdate: function() {
+        document.getElementById('s11-token-pct').innerText = Math.ceil(this.targets()[0].val) + '%';
+      },
+      onComplete: () => {
+        gsap.to('#s11-token-pct-final', { opacity: 1, duration: 0.4 });
+        gsap.to('#s11-save-badge', { opacity: 1, duration: 0.4 });
+      }
+    });
+  }
+  else if (num === 12) {
+    // CTA & Gold Coins
+    gsap.set('#s12-title', { scale: 0.5, opacity: 0 });
+    gsap.set('#s12-gift-card', { scale: 0.5, opacity: 0 });
+    document.getElementById('s12-coins').innerHTML = '';
+
+    gsap.to('#s12-title', { scale: 1, opacity: 1, duration: 0.8, ease: 'back.out(1.5)' });
+    gsap.to('#s12-gift-card', { scale: 1, opacity: 1, duration: 0.8, delay: 0.5, ease: 'elastic.out(1, 0.5)' });
+
+    // Floating gold coins in background
+    const coinsSvg = document.getElementById('s12-coins');
+    const coinCount = 12;
+    for (let c = 0; c < coinCount; c++) {
+      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.textContent = '🪙';
+      text.setAttribute('font-size', Math.random() * 12 + 12);
+      g.appendChild(text);
+      coinsSvg.appendChild(g);
+
+      // Random circular orbiting path
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2 + 50;
+      const r = Math.random() * 200 + 100;
+      let angle = Math.random() * Math.PI * 2;
+      const speed = (Math.random() * 0.01 + 0.005) * (Math.random() > 0.5 ? 1 : -1);
+
+      gsap.set(g, { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle), opacity: 0 });
+      gsap.to(g, { opacity: Math.random() * 0.4 + 0.2, duration: 0.5 });
+
+      gsap.ticker.add(function() {
+        angle += speed;
+        gsap.set(g, {
+          x: cx + r * Math.cos(angle),
+          y: cy + r * Math.sin(angle)
+        });
+      });
+    }
+  }
+}
+
+// 键盘交互
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') {
+    if (mainTl.paused()) mainTl.play(); else mainTl.pause();
+  } else if (e.code === 'ArrowRight') {
+    if (currentIdx < scenes.length - 1) {
+      let t = 0;
+      for (let i = 0; i <= currentIdx; i++) t += scenes[i].dur;
+      mainTl.seek(t);
+    }
+  } else if (e.code === 'ArrowLeft') {
+    if (currentIdx > 0) {
+      let t = 0;
+      for (let i = 0; i < currentIdx - 1; i++) t += scenes[i].dur;
+      mainTl.seek(t);
+    }
+  }
+});
+
+// 监听 iframe 消息以接收来自父容器 (Director Panel) 的指令
+window.addEventListener('message', (e) => {
+  if (!e.data) return;
+  if (e.data.type === 'togglePlay') {
+    if (mainTl.paused()) mainTl.play(); else mainTl.pause();
+  } else if (e.data.type === 'restart') {
+    mainTl.restart();
+  } else if (e.data.type === 'setSpeed') {
+    mainTl.timeScale(e.data.speed);
+  }
+});
+
+// 自动安全启动
+document.addEventListener('DOMContentLoaded', () => {
+  buildDirectorTimeline();
+  // 自适应居中缩放
+  function adjustScale() {
+    const isMobile = window.innerWidth < 768;
+    const baseW = isMobile ? 640 : 900;
+    const baseH = isMobile ? 1138 : 640;
+    const containerW = window.innerWidth;
+    const containerH = window.innerHeight;
+    const scaleX = containerW / baseW;
+    const scaleY = containerH / baseH;
+    let scale = Math.min(scaleX, scaleY, 1.0);
+    if (isMobile) {
+      scale = (containerW / baseW) * 0.98;
+    }
+    const stage = document.getElementById('stage');
+    stage.style.width = baseW + 'px';
+    stage.style.height = baseH + 'px';
+    stage.style.transform = `scale(${scale})`;
+    stage.style.transformOrigin = 'center center';
+  }
+  adjustScale();
+  window.addEventListener('resize', adjustScale);
+  // Start playing automatically
+  mainTl.play();
+});
+</script>
+</body>
+</html>

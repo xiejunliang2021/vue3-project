@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scene 4: SSH 反向隧道与 Rclone 同步</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0b0d16;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #network {
+            width: 100%;
+            height: 100%;
+        }
+        /* Cyberpunk Navigation Panel */
+        .nav-control {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            z-index: 100;
+            font-family: 'Courier New', Courier, monospace;
+            background: rgba(11, 13, 22, 0.85);
+            border: 1px solid #00ffcc;
+            padding: 10px 24px;
+            border-radius: 6px;
+            color: #fff;
+            box-shadow: 0 0 15px rgba(0, 255, 204, 0.25);
+            pointer-events: auto;
+        }
+        .nav-btn {
+            color: #00ffcc;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 13px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .nav-btn:hover {
+            text-shadow: 0 0 8px #00ffcc;
+            color: #fff;
+        }
+        .nav-btn.disabled {
+            color: #555;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        .scene-indicator {
+            color: #8c92ac;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div id="network"></div>
+
+    <div class="nav-control">
+        <a href="saas_vs_local_scene3.html" class="nav-btn">&lt;- 上一幕</a>
+        <span class="scene-indicator">分镜 4 / 5</span>
+        <a href="saas_vs_local_scene5.html" class="nav-btn">下一幕 -&gt;</a>
+    </div>
+
+    <script type="text/javascript">
+        var nodesArray = [{"id": 1, "label": "SSH 反向隧道", "value": 32, "color": {"background": "#ff007f", "border": "#ff007f"}}, {"id": 2, "label": "本地端口映射\\n(2222 -> Mac)", "value": 22, "color": {"background": "#ffaa00", "border": "#ffaa00"}}, {"id": 3, "label": "云端智能体 Hermes", "value": 28, "color": {"background": "#00ffcc", "border": "#00ffcc"}}, {"id": 4, "label": "Rclone 同步", "value": 28, "color": {"background": "#39ff14", "border": "#39ff14"}}, {"id": 5, "label": "Cloudflare R2 桶", "value": 25, "color": {"background": "#00b3ff", "border": "#00b3ff"}}, {"id": 6, "label": "本地 Obsidian 库", "value": 28, "color": {"background": "#00ffcc", "border": "#00ffcc"}}];
+        var edgesArray = [{"from": 3, "to": 1, "label": "加密通道"}, {"from": 1, "to": 2}, {"from": 2, "to": 6, "label": "CLI / API 调用"}, {"from": 6, "to": 4, "label": "自动备份"}, {"from": 4, "to": 5, "label": "云端暂存"}];
+
+        var container = document.getElementById('network');
+        var data = {
+            nodes: new vis.DataSet(nodesArray),
+            edges: new vis.DataSet(edgesArray)
+        };
+
+        var options = {
+            nodes: {
+                shape: 'dot',
+                font: {
+                    color: '#ffffff',
+                    size: 15,
+                    face: 'monospace',
+                    strokeWidth: 2,
+                    strokeColor: '#0b0d16'
+                },
+                borderWidth: 2,
+                shadow: {
+                    enabled: true,
+                    color: 'rgba(0, 255, 204, 0.3)',
+                    size: 10,
+                    x: 0,
+                    y: 0
+                }
+            },
+            edges: {
+                color: {
+                    color: 'rgba(255, 255, 255, 0.2)',
+                    highlight: '#00ffcc',
+                    hover: '#00ffcc'
+                },
+                font: {
+                    color: '#8c92ac',
+                    size: 11,
+                    face: 'monospace',
+                    strokeWidth: 1,
+                    strokeColor: '#0b0d16'
+                },
+                arrows: {
+                    to: { enabled: true, scaleFactor: 0.5 }
+                },
+                smooth: {
+                    enabled: true,
+                    type: 'cubicBezier',
+                    roundness: 0.5
+                }
+            },
+            physics: {
+                enabled: true,
+                solver: 'forceAtlas2Based',
+                forceAtlas2Based: {
+                    gravitationalConstant: -180,
+                    centralGravity: 0.015,
+                    springConstant: 0.04,
+                    springLength: 150,
+                    damping: 0.45,
+                    avoidOverlap: 1
+                },
+                stabilization: {
+                    enabled: false
+                }
+            },
+            interaction: {
+                hover: true,
+                dragNodes: true,
+                dragView: true,
+                zoomView: true
+            }
+        };
+
+        var network = new vis.Network(container, data, options);
+
+        // Keyboard navigation
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'ArrowLeft') {
+                var prev = "saas_vs_local_scene3.html";
+                if (prev) window.location.href = prev;
+            } else if (event.key === 'ArrowRight') {
+                var next = "saas_vs_local_scene5.html";
+                if (next) window.location.href = next;
+            }
+        });
+    </script>
+</body>
+</html>

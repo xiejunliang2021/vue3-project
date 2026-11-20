@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>竖屏分镜 3</title>
+  <style>
+    :root {
+      --bg: #060913;
+      --green: #39ff14;
+      --red: #ff3b3b;
+      --cyan: #00fff0;
+      --magenta: #ff2d78;
+      --blue: #00b3ff;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg);
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Courier New', Courier, monospace;
+      color: #ffffff;
+    }
+    #stage {
+      position: relative;
+      width: 640px;
+      height: 1138px;
+      background: #060913;
+      border: 2px solid #1a233d;
+      box-shadow: 0 0 20px rgba(0, 243, 255, 0.1);
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+    .cyber-card {
+      position: absolute;
+      border: 2px solid var(--border-color, #1a233d);
+      background: rgba(6, 9, 19, 0.95);
+      padding: 15px;
+      box-sizing: border-box;
+      box-shadow: 0 0 15px var(--glow-color, rgba(0, 243, 255, 0.15));
+      border-radius: 4px;
+    }
+    .font-mono {
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+    }
+  </style>
+  <script type="text/javascript" src="js/gsap.min.js"></script>
+</head>
+<body>
+  <div id="stage" data-composition-id="root" data-start="0" data-duration="5" data-width="640" data-height="1138">
+    
+      <div id="chart-win" class="cyber-card" style="left: 40px; top: 220px; width: 560px; height: 380px; --border-color: var(--cyan);">
+        <svg style="width: 100%; height: 100%;" viewBox="0 0 560 380">
+          <line x1="40" y1="50" x2="520" y2="50" stroke="#1a233d" stroke-width="1" />
+          <line x1="40" y1="180" x2="520" y2="180" stroke="#1a233d" stroke-width="1" />
+          <line x1="40" y1="310" x2="520" y2="310" stroke="#1a233d" stroke-width="1" />
+          <path id="graph-path" d="M 40 330 L 120 310 L 220 220 L 320 260 L 420 120 L 520 40" fill="none" stroke="var(--cyan)" stroke-width="5" stroke-linecap="round" />
+        </svg>
+        <div id="revenue-tag" class="cyber-card font-mono" style="position: absolute; left: 130px; top: 120px; width: 300px; --border-color: var(--green); --glow-color: rgba(57,255,20,0.4); text-align: center; padding: 15px;">
+          <div style="font-size: 16px; color: #888;">公司年营收</div>
+          <div id="rev-text" style="font-size: 36px; color: var(--green); margin-top: 10px;">0</div>
+        </div>
+      </div>
+      <div id="subtitle" style="position: absolute; bottom: 80px; left: 50px; right: 50px; text-align: center; font-size: 28px; color: #fff; line-height: 1.6;">公司年营收超过400万美金。</div>
+
+  </div>
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tl = gsap.timeline({ paused: true });
+    
+    
+    const path = document.querySelector("#graph-path");
+    const length = path.getTotalLength();
+    path.style.strokeDasharray = length;
+    path.style.strokeDashoffset = length;
+    
+    tl.fromTo("#chart-win", {opacity: 0, scale: 0.95}, {opacity: 1, scale: 1, duration: 0.6}, 0.2);
+    tl.to(path.style, {strokeDashoffset: 0, duration: 2.0, ease: "power2.out"}, 0.8);
+    tl.fromTo("#revenue-tag", {scale: 0}, {scale: 1, ease: "back.out(2)", duration: 0.5}, 2.2);
+    
+    const revObj = { val: 0 };
+    tl.to(revObj, {
+      val: 4000000,
+      duration: 1.8,
+      ease: "power1.out",
+      onUpdate: () => {
+        document.querySelector("#rev-text").innerText = "$" + Math.floor(revObj.val / 1000000) + "M+";
+      }
+    }, 1.0);
+    
+    tl.fromTo("#subtitle", {opacity: 0}, {opacity: 1, duration: 0.5}, 0.2);
+
+    
+    window.__timelines["root"] = tl;
+    
+    window.addEventListener('message', (e) => {
+      if (!e.data) return;
+      if (e.data.type === 'togglePlay') {
+        if (tl.paused()) tl.play(); else tl.pause();
+      } else if (e.data.type === 'restart') {
+        tl.restart();
+      } else if (e.data.type === 'setSpeed') {
+        tl.timeScale(e.data.speed);
+      }
+    });
+  </script>
+</body>
+</html>

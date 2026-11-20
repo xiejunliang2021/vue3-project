@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Obsidian + AI 硅基合伙人 — 逐句分镜脚本</title>
+<script src="js/gsap.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #070a13; color: #00FFF0; font-family: 'Courier New', Consolas, monospace; overflow: hidden; height: 100vh; width: 100vw; }
+  
+  /* 极简网格背景 - 不含纵向扫描线，无移动横线光栅 */
+  #grid-bg { 
+    position: fixed; inset: 0; z-index: 0; 
+    background-image: 
+      linear-gradient(rgba(0, 255, 240, 0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 255, 240, 0.02) 1px, transparent 1px);
+    background-size: 50px 50px; 
+    pointer-events: none; 
+  }
+  
+  #main-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+  
+  /* 核心舞台 */
+  #stage { position: fixed; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center; }
+  .scene-container { position: relative; width: 900px; height: 640px; display: flex; align-items: center; justify-content: center; }
+  
+  /* HUD 字幕面板 */
+  #hud { 
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 50; width: 88vw; max-width: 680px; 
+    background: rgba(7, 10, 19, 0.94); border: 1px solid rgba(0, 255, 240, 0.3); border-radius: 16px; 
+    padding: 12px 18px; backdrop-filter: blur(12px); box-shadow: 0 0 20px rgba(0, 255, 240, 0.1); 
+  }
+  #hud-label { font-size: 10px; color: rgba(0, 255, 240, 0.45); letter-spacing: 2px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
+  #hud-clip { height: calc(1.45em * 2); overflow: hidden; }
+  #hud-text { font-size: 12px; line-height: 1.45; color: #cbeff7; font-family: sans-serif; display: block; font-weight: 500; }
+  
+  /* 全屏按钮与控制按钮 */
+  #fullscreen-btn {
+    background: rgba(0, 255, 240, 0.1); border: 1px solid rgba(0, 255, 240, 0.3); color: #00FFF0; 
+    padding: 4px 8px; border-radius: 4px; font-size: 9px; cursor: pointer; text-transform: uppercase;
+    transition: all 0.2s;
+  }
+  #fullscreen-btn:hover { background: rgba(0, 255, 240, 0.2); box-shadow: 0 0 8px rgba(0, 255, 240, 0.4); }
+
+  /* 进度指示条 */
+  #progress-wrap { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); width: 80vw; max-width: 580px; z-index: 50; }
+  #prog-bar-bg { height: 2px; background: rgba(0, 255, 240, 0.1); border-radius: 2px; }
+  #prog-bar { height: 2px; width: 0%; background: linear-gradient(90deg, #ff2d78, #00FFF0); border-radius: 2px; }
+  #prog-info { display: flex; justify-content: space-between; margin-top: 5px; font-size: 10px; color: rgba(0, 255, 240, 0.4); letter-spacing: 1px; }
+
+  /* 赛博颜色阴影规范 */
+  .glow-cyan { box-shadow: 0 0 15px rgba(0,255,240,0.35); border: 1px solid #00FFF0; }
+  .glow-magenta { box-shadow: 0 0 15px rgba(255,45,120,0.35); border: 1px solid #ff2d78; }
+  .glow-gold { box-shadow: 0 0 15px rgba(255,215,0,0.35); border: 1px solid #ffd700; }
+  .glow-blue { box-shadow: 0 0 15px rgba(0,179,255,0.35); border: 1px solid #00b3ff; }
+
+  /* 常驻进度拓扑图 (Progress Topology - 挂载在角落的精致指示器) */
+  #progress-topology {
+    position: absolute; top: 12px; right: 12px; width: 70px; height: 60px;
+    background: rgba(7, 10, 19, 0.85); border: 1.5px solid rgba(0, 255, 240, 0.25);
+    border-radius: 8px; z-index: 40; display: flex; align-items: center; justify-content: center;
+    transition: all 0.3s;
+  }
+  .indicator-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(0, 255, 240, 0.15); margin: 0 3px; transition: all 0.4s; }
+  .indicator-dot.active { background: #00FFF0; box-shadow: 0 0 8px #00FFF0; }
+  .indicator-dot.step2 { background: rgba(255, 45, 120, 0.15); }
+  .indicator-dot.step2.active { background: #ff2d78; box-shadow: 0 0 8px #ff2d78; }
+
+  /* 自定义动画元素 */
+  .actor-shape { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .actor-card { position: absolute; width: 220px; background: rgba(7, 10, 19, 0.92); border-radius: 10px; padding: 12px; font-size: 11px; color: #cbeff7; line-height: 1.5; opacity: 0; }
+  .terminal-style { background: rgba(0, 0, 0, 0.7); border: 1.5px solid rgba(0, 255, 240, 0.25); border-radius: 6px; padding: 8px; font-family: 'Courier New', monospace; font-size: 10px; color: #00FFcc; overflow: hidden; height: 90px; width: 100%; box-shadow: inset 0 0 8px rgba(0, 255, 240, 0.1); }
+  
+  .big-icon { font-size: 32px; filter: drop-shadow(0 0 6px rgba(0, 255, 240, 0.5)); margin-bottom: 5px; }
+
+  /* 21个场景的具体显示/隐藏 */
+  .g-scene { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; }
+  .g-scene.active { pointer-events: auto; }
+
+  /* 竖屏/手机端自适应布局适配 */
+  @media (max-aspect-ratio: 1/1) {
+    .scene-container {
+      width: 640px !important;
+      height: 1138px !important;
+    }
+    
+    /* HUD 卡片在竖屏下的位置 */
+    #hud {
+      top: 30px !important;
+      width: 90vw !important;
+      max-width: 580px !important;
+    }
+    
+    /* 进度拓扑图在竖屏下横向排列 */
+    #progress-topology {
+      top: 150px !important;
+      right: 50% !important;
+      transform: translateX(50%) !important;
+      width: 120px !important;
+      height: 35px !important;
+      flex-direction: row !important;
+    }
+    
+    /* Scene 3: 创意大脑与机器人垂直层叠 */
+    #s3-human {
+      left: 320px !important;
+      top: 400px !important;
+    }
+    #s3-robot {
+      left: 320px !important;
+      top: 700px !important;
+    }
+    
+    /* Scene 6: 卡片重置为垂直排列 */
+    #s6-left {
+      left: 320px !important;
+      top: 400px !important;
+      transform: translate(-50%, -50%) !important;
+    }
+    #s6-right {
+      left: 320px !important;
+      top: 720px !important;
+      right: auto !important;
+      transform: translate(-50%, -50%) !important;
+    }
+    
+    /* Scene 7: 打包动画位置调整 */
+    #s7-p1 { left: 200px !important; top: 420px !important; }
+    #s7-p2 { left: 440px !important; top: 420px !important; }
+    #s7-p3 { left: 320px !important; top: 320px !important; }
+    #s7-package { left: 50% !important; top: 58% !important; }
+
+    /* Scene 10: 文件夹垂直排布 */
+    #s10-folders-wrap {
+      flex-direction: column !important;
+      gap: 32px !important;
+    }
+    
+    /* Scene 14: 自动更新 Wiki 索引垂直排布 */
+    #s14-wrap {
+      flex-direction: column !important;
+      align-items: center !important;
+      gap: 32px !important;
+    }
+    
+    /* Scene 18: 主动甄别漏斗与创意宇宙垂直排布 */
+    #s18-wrap {
+      width: 480px !important;
+      height: 600px !important;
+    }
+    #s18-wrap > div:first-child {
+      left: 50% !important;
+      top: 30% !important;
+      transform: translate(-50%, -50%) !important;
+    }
+    #s18-wrap > .actor-shape {
+      left: 50% !important;
+      top: 70% !important;
+      transform: translate(-50%, -50%) !important;
+    }
+  }
+</style>
+
+<style>
+  #hud, #progress-wrap, #progress-topology { display: none !important; }
+</style>
+        
+</head>
+<body>
+<canvas id="main-canvas"></canvas>
+<div id="grid-bg"></div>
+
+<!-- HUD -->
+<div id="hud">
+  <div id="hud-label">
+    <span>SCENE <span id="scene-num">1</span> // 硅基合伙人工作流</span>
+    <button id="fullscreen-btn" onclick="toggleFullScreen()">全屏录屏模式</button>
+  </div>
+  <div id="hud-clip"><span id="hud-text">正在初始化分镜...</span></div>
+</div>
+
+<!-- 角落的常驻进度拓扑图 -->
+<div id="progress-topology">
+  <div id="dot-s1" class="indicator-dot active" title="破局解"></div>
+  <div id="dot-s2" class="indicator-dot step2" title="Smart Connections"></div>
+  <div id="dot-s3" class="indicator-dot step2" title="Claude Code"></div>
+</div>
+
+<!-- 舞台 -->
+<div id="stage" data-composition-id="root" data-start="0" data-duration="7.0" data-width="900" data-height="640">
+  <div class="scene-container">
+    
+    <!-- SVG 连线管道 -->
+    <svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;" viewBox="0 0 900 640">
+      <defs>
+        <marker id="arrow-cyan" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#00FFF0"/></marker>
+        <marker id="arrow-magenta" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#ff2d78"/></marker>
+      </defs>
+      
+      <!-- S3 同频连线 -->
+      <g id="s3-connect-group" style="display: none; opacity: 0;">
+        <line id="s3-connect-line" x1="330" y1="320" x2="570" y2="320" stroke="rgba(0, 255, 240, 0.15)" stroke-width="2.5" stroke-dasharray="6 6"/>
+        <path id="s3-flow-light" d="M 330,320 L 570,320" fill="none" stroke="#00FFF0" stroke-width="3" stroke-dasharray="100" stroke-dashoffset="100"/>
+      </g>
+      
+      <!-- S6 连接管线 -->
+      <path id="s6-pipe" d="M 300,320 C 380,240 520,240 600,320" fill="none" stroke="rgba(255, 45, 120, 0.15)" stroke-width="2" stroke-dasharray="4 4" opacity="0"/>
+      <path id="s6-pipe-active" d="M 300,320 C 380,240 520,240 600,320" fill="none" stroke="#ff2d78" stroke-width="2.5" stroke-dasharray="150" stroke-dashoffset="150" opacity="0" marker-end="url(#arrow-magenta)"/>
+
+      <!-- S9 管道 -->
+      <path id="s9-pipe" d="M 450,220 L 450,300" fill="none" stroke="rgba(0, 255, 240, 0.15)" stroke-width="2" stroke-dasharray="4 4" opacity="0"/>
+      <path id="s9-pipe-active" d="M 450,220 L 450,300" fill="none" stroke="#00FFF0" stroke-width="2.5" stroke-dasharray="100" stroke-dashoffset="100" opacity="0" marker-end="url(#arrow-cyan)"/>
+    </svg>
+
+    <!-- ══ Scene 1: 破局的钥匙 ══ -->
+    <div class="g-scene" id="sc-1">
+      <div id="s1-key" class="actor-shape glow-cyan" style="left:50%;top:50%;width:110px;height:110px;border-radius:50%;background:rgba(0,255,240,0.06);">
+        <div class="big-icon">🔑</div>
+        <div style="font-size:10px;color:#00FFF0;font-weight:700;letter-spacing:1px;">破局解</div>
+      </div>
+    </div>
+
+    <!-- ══ Scene 2: 杂乱的笔记 ══ -->
+    <div class="g-scene" id="sc-2">
+      <div id="s2-cards-wrap" style="position:relative;width:400px;height:300px;opacity:0;"></div>
+      <div id="s2-dust-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,0.45);opacity:0;pointer-events:none;z-index:2;display:flex;align-items:center;justify-content:center;">
+        <span style="font-size:15px;color:#99aab5;letter-spacing:3px;font-weight:700;border:1px solid #99aab5;padding:8px 16px;background:rgba(0,0,0,0.8);">落满灰尘 // 从未再看</span>
+      </div>
+    </div>
+
+    <!-- ══ Scene 3: 同频合伙人 ══ -->
+    <div class="g-scene" id="sc-3">
+      <!-- 人剪影 -->
+      <div id="s3-human" class="actor-shape glow-cyan" style="left:330px;top:320px;width:95px;height:95px;border-radius:50%;background:rgba(0,255,240,0.07);opacity:0;">
+        <div style="font-size:30px;">👤</div>
+        <div style="font-size:9px;color:#00FFF0;margin-top:2px;">创意大脑</div>
+      </div>
+      <!-- 机器人剪影 -->
+      <div id="s3-robot" class="actor-shape glow-magenta" style="left:570px;top:320px;width:95px;height:95px;border-radius:50%;background:rgba(255,45,120,0.07);opacity:0;">
+        <div style="font-size:30px;">🤖</div>
+        <div style="font-size:9px;color:#ff2d78;margin-top:2px;">硅基合伙人</div>
+      </div>
+    </div>
+
+    <!-- ══ Scene 4: 拓扑工作流 ══ -->
+    <div class="g-scene" id="sc-4">
+      <div id="s4-flowchart" style="width:360px;height:240px;border:1.5px solid rgba(0,255,240,0.3);border-radius:12px;background:rgba(7,10,19,0.92);padding:16px;opacity:0;display:flex;flex-direction:column;justify-content:space-around;" class="glow-cyan">
+        <div style="font-size:10px;color:rgba(0,255,240,0.5);">[ Obsidian + AI WORKFLOW ]</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="border:1px solid #00FFF0;padding:6px;font-size:9px;background:rgba(0,255,240,0.05);">1. 零散笔记</div>
+          <div style="color:#00FFF0;">➔</div>
+          <div style="border:1px solid #ff2d78;padding:6px;font-size:9px;background:rgba(255,45,120,0.05);">2. 自动关联</div>
+          <div style="color:#ff2d78;">➔</div>
+          <div style="border:1px solid #ffd700;padding:6px;font-size:9px;background:rgba(255,215,0,0.05);">3. 闭环执行</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ Scene 5: Smart Connections 图标 ══ -->
+    <div class="g-scene" id="sc-5">
+      <div id="s5-icon" class="actor-shape glow-cyan" style="left:50%;top:50%;width:120px;height:120px;border-radius:50%;background:rgba(0,255,240,0.06);opacity:0;">
+        <div class="big-icon">🔌</div>
+        <div style="font-size:10px;color:#00FFF0;font-weight:700;text-align:center;">Smart<br>Connections</div>
+      </div>
+    </div>
+
+    <!-- ══ Scene 6: 自动捞起旧笔记 ══ -->
+    <div class="g-scene" id="sc-6">
+      <div id="s6-left" class="actor-card glow-cyan" style="left:120px;top:280px;opacity:0;">
+        <div style="font-weight:900;color:#00FFF0;margin-bottom:6px;">✍️ 当前正在写的新项目</div>
+        <div style="font-size:10px;color:rgba(200,240,255,0.7);">正在策划一人公司的 AI 自动部署工具链...</div>
+      </div>
+      
+      <div id="s6-right" class="actor-card glow-magenta" style="right:120px;top:280px;opacity:0;">
+        <div style="font-weight:900;color:#ff2d78;margin-bottom:6px;">💡 自动捞出的旧灵感</div>
+        <div style="font-size:10px;color:rgba(255,200,220,0.7);">[2026-06-25] 自动部署防抖设计、股票过滤指标算法...</div>
+      </div>
+    </div>
+
+    <!-- ══ Scene 7: Smart Context 打包 ══ -->
+    <div class="g-scene" id="sc-7">
+      <div id="s7-p1" class="actor-shape" style="left:330px;top:240px;font-size:24px;opacity:0;">📄</div>
+      <div id="s7-p2" class="actor-shape" style="left:570px;top:240px;font-size:24px;opacity:0;">📄</div>
+      <div id="s7-p3" class="actor-shape" style="left:450px;top:180px;font-size:24px;opacity:0;">📄</div>
+      
+      <div id="s7-package" class="actor-shape glow-gold" style="left:50%;top:58%;width:130px;height:110px;border-radius:12px;background:rgba(255,215,0,0.06);opacity:0;border:1px solid #ffd700;">
+        <div style="font-size:28px;">📦</div>
+        <div style="font-size:9px;color:#ffd700;font-weight:900;margin-top:2px;">Smart Context</div>
+      </div>
+    </div>
+
+    <!-- ══ Scene 8: 闭环环形拓扑 ══ -->
+    <div class="g-scene" id="sc-8">
+      <div id="s8-circle-wrap" class="actor-shape" style="left:50%;top:50%;width:260px;height:260px;opacity:0;">
+        <svg width="260" height="260" viewBox="0 0 260 260" style="position:absolute;inset:0;">
+          <circle id="s8-circle-path" cx="130" cy="130" r="100" fill="none" stroke="#00FFF0" stroke-width="3" stroke-dasharray="628" stroke-dashoffset="628"/>
+        </svg>
+        <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;">
+          <div style="font-size:32px;">🔄</div>
+          <div style="font-size:11px;color:#00FFF0;font-weight:900;letter-spacing:1px;margin-top:6px;">闭环大脑</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ Scene 9: Claude Code 解锁 ══ -->
+    <div class="g-scene" id="sc-9">
+      <div id="s9-unlock" class="actor-shape glow-cyan" style="left:50%;top:50%;width:130px;height:130px;border-radius:50%;background:rgba(0,255,240,0.08);opacity:0;">
+        <div class="big-icon">⚡</div>
+        <div style="font-size:12px;color:#00FFF0;font-weight:900;letter-spacing:1.5px;font-family:sans-serif;">CLAUDE CODE</div>
+      </div>
+    </div>
+
+    <!-- ══ Scene 10: raw, templates, wiki 三色文件夹 ══ -->
+    <div class="g-scene" id="sc-10">
+      <div style="display:flex;gap:36px;align-items:center;justify-content:center;opacity:0;" id="s10-folders-wrap">
+        <div class="actor-shape glow-blue" style="position:relative;width:95px;height:95px;border-radius:10px;background:rgba(0,179,255,0.07);display:flex;flex-direction:column;align-items:center;justify-content:center;transform:none;">
+          <div style="font-size:24px;">📁</div>
+          <div style="font-size:10px;color:#00b3ff;font-weight:900;margin-top:3px;">raw</div>
+        </div>
+        <div class="actor-shape glow-magenta" style="position:relative;width:95px;height:95px;border-radius:10px;background:rgba(255,45,120,0.07);display:flex;flex-direction:column;align-items:center;justify-content:center;transform:none;">
+          <div style="font-size:24px;">📁</div>
+          <div style="font-size:10px;color:#ff2d78;font-weight:900;margin-top:3px;">templates</div>
+        </div>
+        <div class="actor-shape glow-cyan" style="position:relative;width:95px;height:95px;border-radius:10px;background:rgba(0,255,240,0.07);display:flex;flex-direction:column;align-items:center;justify-content:center;transform:none;">
+          <div style="font-size:24px;">📁</div>
+          <div style="font-size:10px;color:#00FFF0;font-weight:900;margin-top:3px;">wiki</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ Scene 11: raw 文件夹与只读小锁 ══ -->
+    <div class="g-scene" id="sc-11">
+      <div id="s11-box" class="actor-shape glow-blue" style="left:50%;top:50%;width:160px;height:120px;border-radius:12px;background:rgba(0,179,255,0.08);opacity:0;">
+        <div style="font-size:28px;">📂</div>
+        <div style="font-size:11px;color:#00b3ff;font-weight:900;margin-top:3px;">raw 收件箱</div>
+        <div style="position:absolute;top:-8px;right:-8px;background:#ff2d78;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:12px;" title="只读不可变">🔒</div>
+      </div>
+    </div>
+
+    <!-- ══ Scene 12: Obsidian 终端唤醒 ══ -->
+    <div class="g-scene" id="sc-12">
+      <div id="s12-terminal" style="width:480px;height:180px;opacity:0;" class="glow-cyan">
+        <div class="terminal-style" style="height:100%;padding:14px;">
+          <div style="color:rgba(0,255,204,0.4);margin-bottom:6px;">// OBSIDIAN INTEGRATED TERMINAL v2.1</div>
+          <div id="s12-line1">> hermes status --active</div>
+          <div id="s12-line2" style="color:#39ff14;opacity:0;">STATUS: READY - Claude Code initialized.</div>
+          <div id="s12-line3" style="opacity:0;">> _<span class="cursor">█</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ Scene 13: 说话气泡 ══ -->
+    <div class="g-scene" id="sc-13">
+      <div id="s13-bubble" style="width:380px;background:rgba(0,0,0,0.85);border:1.5px solid #00FFF0;border-radius:12px;padding:16px;opacity:0;" class="glow-cyan">
+        <div style="font-size:9px;color:rgba(0,255,204,0.4);margin-bottom:5px;">SPEAK TO CLAUDE CODE:</div>
+        <div style="font-size:13px;color:#fff;line-height:1.5;font-weight:bold;" id="s13-typed-cmd"></div>
+      </div>
+    </div>
+
+    <!-- ══ Scene 14: 自动更新 Wiki 索引 ══ -->
+    <div class="g-scene" id="sc-14">
+      <div style="display:flex;gap:36px;align-items:center;width:min(600px,94vw);opacity:0;" id="s14-wrap">
+        <!-- Wiki 新生成页 -->
+        <div class="actor-card glow-cyan" style="position:relative;width:240px;height:160px;padding:12px;display:flex;flex-direction:column;justify-content:space-between;transform:none;opacity:1;">
+          <div style="font-weight:900;color:#00FFF0;">📁 wiki/concepts/</div>
+          <div style="background:rgba(0,255,204,0.05);border:1px dashed #00FFF0;padding:6px;font-size:9px;">
+            + new-concept-file.md<br>
+            + AI-workflow-design.md
+          </div>
+          <div style="font-size:9px;color:rgba(0,255,204,0.5);text-align:right;">自动提取 & 生成</div>
+        </div>
+        <!-- Index.md -->
+        <div class="actor-card glow-gold" style="position:relative;width:240px;height:160px;padding:12px;display:flex;flex-direction:column;justify-content:space-between;transform:none;opacity:1;">
+          <div style="font-weight:900;color:#ffd700;">📄 index.md (全局索引)</div>
+          <div style="background:rgba(255,215,0,0.05);border:1px dashed #ffd700;padding:6px;font-size:9px;line-height:1.4;">
+            ...<br>
+            - [[new-concept-file]]<br>
+            <span style="color:#ffd700;background:rgba(255,215,0,0.15);" id="s14-index-append">- [[AI-workflow-design]]</span>
+          </div>
+          <div style="font-size:9px;color:rgba(255,215,0,0.5);text-align:right;">物理自动追加</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ Scene 15: 杠铃策略 ══ -->
+    <div class="g-scene" id="sc-15">
+      <div id="s15-barbell" class="actor-shape" style="left:50%;top:50%;opacity:0;display:flex;flex-direction:column;align-items:center;gap:12px;">
+        <svg width="240" height="90" viewBox="0 0 240 90" style="overflow:visible;">
+          <!-- 杠铃杆 -->
+          <line x1="30" y1="45" x2="210" y2="45" stroke="#ffd700" stroke-width="6"/>
+          <!-- 两端不平衡重物 -->
+          <rect x="10" y="20" width="20" height="50" rx="3" fill="#ff2d78" class="glow-magenta"/>
+          <rect x="210" y="10" width="20" height="70" rx="3" fill="#00FFF0" class="glow-cyan"/>
+        </svg>
+        <div style="font-size:12px;color:#ffd700;font-weight:900;letter-spacing:2px;">杠铃策略 // BARBELL STRATEGY</div>
+      </div>
+    </div>
+
+    <!-- ══ Scene 16: 笔与防御光环 ══ -->
+    <div class="g-scene" id="sc-16">
+      <div id="s16-shield-wrap" class="actor-shape" style="left:50%;top:50%;width:220px;height:220px;opacity:0;">
+        <!-- 笔图标居中 -->
+        <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:42px;z-index:3;">🖋️</div>
+        <!-- 保护盾光环 -->
+        <div style="position:absolute;inset:20px;border-radius:50%;border:2px solid #00FFF0;background:rgba(0,255,240,0.04);z-index:2;box-shadow:0 0 20px #00FFF0;" id="s16-shield"></div>
+        <!-- 飞入的污染小点 -->
+        <div class="s16-shatter-dot" style="position:absolute;font-size:14px;left:-20px;top:50px;">💬</div>
+        <div class="s16-shatter-dot" style="position:absolute;font-size:14px;right:-10px;top:120px;">💬</div>
+        <div class="s16-shatter-dot" style="position:absolute;font-size:14px;left:60px;bottom:-20px;">💬</div>
+      </div>
+    </div>
+
+    <!-- ══ Scene 17: AI 暂存区警示色 ══ -->
+    <div class="g-scene" id="sc-17">
+      <div id="s17-box" class="actor-shape glow-magenta" style="left:50%;top:50%;width:165px;height:125px;border-radius:12px;background:rgba(255,45,120,0.08);opacity:0;">
+        <div style="font-size:30px;">📁</div>
+        <div style="font-size:11px;color:#ff2d78;font-weight:900;margin-top:2px;">AI 暂存区</div>
+        <div style="position:absolute;top:-8px;right:-8px;background:#ffd700;color:#000;font-size:9px;font-weight:900;padding:2px 6px;border-radius:4px;border:1px solid #000;">⚠ 未经筛选</div>
+      </div>
+    </div>
+
+    <!-- ══ Scene 18: 主动甄别与星云宇宙 ══ -->
+    <div class="g-scene" id="sc-18">
+      <div id="s18-wrap" style="position:relative;width:580px;height:240px;opacity:0;">
+        <!-- 漏斗 -->
+        <div style="position:absolute;left:20%;top:50%;transform:translateY(-50%);text-align:center;z-index:2;">
+          <div style="font-size:38px;animation:float 2s ease-in-out infinite;">⏳</div>
+          <div style="font-size:9px;color:#ffd700;margin-top:4px;">甄别漏斗</div>
+        </div>
+        <!-- 个人知识星云 -->
+        <div class="actor-shape glow-cyan" style="left:75%;top:50%;width:150px;height:150px;border-radius:50%;background:rgba(0,255,240,0.06);z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+          <div style="font-size:38px;">🌌</div>
+          <div style="font-size:10px;color:#00FFF0;font-weight:900;margin-top:3px;">个人创意宇宙</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ Scene 19a: 工作流回顾 ══ -->
+    <div class="g-scene" id="sc-19a">
+      <div id="s19a-flow" style="width:480px;height:260px;border:1px solid rgba(0,255,240,0.3);border-radius:16px;background:rgba(7,10,19,0.95);padding:20px;opacity:0;" class="glow-cyan">
+        <div style="font-size:10px;color:rgba(0,255,240,0.5);margin-bottom:12px;">// 人机协同闭环工作流大纲回顾</div>
+        <div style="display:flex;flex-direction:column;gap:12px;font-size:11px;">
+          <div style="color:#00FFF0;border-left:3px solid #00FFF0;padding-left:8px;">✔ Step 1: 零散笔记 ➔ Smart Connections 智能捞取</div>
+          <div style="color:#ff2d78;border-left:3px solid #ff2d78;padding-left:8px;">✔ Step 2: raw 文件夹收件 ➔ Claude Code 自动维基化</div>
+          <div style="color:#ffd700;border-left:3px solid #ffd700;padding-left:8px;">✔ 心法: 隔离暂存区 ➔ 主动甄别整合</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ Scene 19b: 立即行动脉冲 ══ -->
+    <div class="g-scene" id="sc-19b">
+      <div id="s19b-pulse" class="actor-shape glow-gold" style="left:50%;top:50%;width:160px;height:160px;border-radius:50%;background:rgba(255,215,0,0.08);opacity:0;">
+        <div style="font-size:38px;">🚀</div>
+        <div style="font-size:12px;color:#ffd700;font-weight:900;margin-top:5px;letter-spacing:1px;">现在就升级</div>
+      </div>
+    </div>
+
+    <!-- ══ Scene 20: 关注我们上机实操 ══ -->
+    <div class="g-scene" id="sc-20">
+      <div id="s20-cta" style="text-align:center;opacity:0;">
+        <div style="font-size:42px;margin-bottom:16px;filter:drop-shadow(0 0 10px #ffd700);">★</div>
+        <h2 style="font-size:24px;font-weight:900;color:#ffd700;letter-spacing:3px;margin-bottom:8px;">关注 Saily</h2>
+        <p style="font-size:12px;color:rgba(0,255,204,0.7);letter-spacing:1.5px;">下一期我们直接带你上机实操！</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 进度条及控制 -->
+<div id="progress-wrap">
+  <div id="prog-bar-bg"><div id="prog-bar"></div></div>
+  <div id="prog-info"><span id="prog-scene">1 / 21</span><span id="prog-time">0s</span></div>
+</div>
+
+<script>
+// 21幕剧本配置（完全对齐口播逐字稿）
+const scenes = [
+  { id: 1, dur: 6.0, text: "在这个 AI 时代，掌握核心工具链就是一人公司唯一的破局解。" },
+  { id: 2, dur: 7.0, text: "你是不是也跟我们一样，存了上千条笔记，却一次都没再看过？" },
+  { id: 3, dur: 7.0, text: "其实，我们缺的根本不是信息，而是一个能跟我们同频的“硅基合伙人”。" },
+  { id: 4, dur: 7.0, text: "今天我们直接拆解一套在 Obsidian 里落地、免费且持久的 AI 上下文闭环工作流。" },
+  { id: 5, dur: 7.0, text: "第一步，我们用 Smart Connections 插件把零散的笔记自动关联起来。" },
+  { id: 6, dur: 7.0, text: "当我们写新项目的时候，它会在右侧栏自动帮我们把关联的旧笔记捞出来。" },
+  { id: 7, dur: 7.0, text: "接着，我们用 Smart Context 把这些相关笔记一键打包成动态上下文。" },
+  { id: 8, dur: 7.0, text: "这就形成了闭环，AI 聊天的每一句都基于我们自己的知识库。" },
+  { id: 9, dur: 7.0, text: "第二步，如果我们想更进一步，可以直接在 Obsidian 内部跑 Claude Code。" },
+  { id: 10, dur: 7.0, text: "我们的库里只需要建三个文件夹，分别是 raw、templates 和 wiki。" },
+  { id: 11, dur: 7.0, text: "raw 文件夹就是我们的收件箱，我们把网页剪藏、PDF、图片直接往里扔。" },
+  { id: 12, dur: 7.0, text: "然后，我们在 Obsidian 的集成终端里，直接唤醒 Claude Code。" },
+  { id: 13, dur: 7.0, text: "你只需对它说一句：“把 raw 里的新资料导入 wiki”。" },
+  { id: 14, dur: 7.0, text: "它就会自动提取知识，生成新的 wiki 页面，并自动更新我们的全局索引。" },
+  { id: 15, dur: 7.0, text: "但这里有个核心心法，我们必须对 AI 采取“杠铃策略”。" },
+  { id: 16, dur: 7.0, text: "千万别让 AI 生成的废话，取代了我们自己的写作和思考。" },
+  { id: 17, dur: 7.0, text: "我们建议在库里划出一个专属的“AI 暂存区”。" },
+  { id: 18, dur: 7.0, text: "只有经过我们主动想象、甄别、过滤的内容，才能整合进我们个人的创意宇宙。" },
+  { id: 19, dur: 3.0, text: "你觉得这套人机协同的工作流怎么样？" },
+  { id: 20, dur: 3.0, text: "你想不想今天就动手，把你的 Obsidian 升级成一个真正懂你的硅基合伙人？" },
+  { id: 21, dur: 6.0, text: "关注我们，下一期我们直接带你上机实操。" }
+];
+
+const totalDur = scenes.reduce((a, b) => a + b.dur, 0);
+let currentIdx = 0;
+let mainTl = null;
+
+// DOM
+const hudNum = document.getElementById('scene-num');
+const hudText = document.getElementById('hud-text');
+const progBar = document.getElementById('prog-bar');
+const progScene = document.getElementById('prog-scene');
+const progTime = document.getElementById('prog-time');
+
+// Canvas 氛围小点
+let cvs, ctx;
+const particles = [];
+
+function adjustScale() {
+  const container = document.querySelector('.scene-container');
+  if (!container) return;
+  const isPortrait = window.innerWidth < window.innerHeight;
+  let baseW = 900;
+  let baseH = 640;
+  if (isPortrait) {
+    baseW = 640;
+    baseH = 1138;
+  }
+  const scaleX = window.innerWidth / baseW;
+  const scaleY = window.innerHeight / baseH;
+  let scale = Math.min(scaleX, scaleY);
+  if (isPortrait) {
+    scale = (window.innerWidth / baseW) * 0.98;
+  }
+  container.style.transform = `scale(${scale})`;
+  container.style.transformOrigin = 'center center';
+}
+
+function initCanvas() {
+  cvs = document.getElementById('main-canvas');
+  ctx = cvs.getContext('2d');
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+  
+  // 仅在背景生成低密度的粒子以保持极致纯净
+  for (let i = 0; i < 35; i++) {
+    particles.push({
+      x: Math.random() * cvs.width,
+      y: Math.random() * cvs.height,
+      r: Math.random() * 1.5 + 0.5,
+      speedX: (Math.random() - 0.5) * 0.25,
+      speedY: (Math.random() - 0.5) * 0.25,
+      alpha: Math.random() * 0.4 + 0.1
+    });
+  }
+  
+  function draw() {
+    ctx.clearRect(0, 0, cvs.width, cvs.height);
+    particles.forEach(p => {
+      p.x += p.speedX;
+      p.y += p.speedY;
+      if (p.x < 0 || p.x > cvs.width) p.speedX *= -1;
+      if (p.y < 0 || p.y > cvs.height) p.speedY *= -1;
+      ctx.fillStyle = `rgba(0, 255, 240, ${p.alpha})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+function resizeCanvas() {
+  cvs.width = window.innerWidth;
+  cvs.height = window.innerHeight;
+}
+
+// 调度时间轴
+function buildDirectorTimeline() {
+  mainTl = gsap.timeline({
+    onUpdate: () => {
+      const time = mainTl.time();
+      const pct = (time / totalDur) * 100;
+      progBar.style.width = pct + '%';
+      progTime.innerText = Math.floor(time) + 's / ' + Math.floor(totalDur) + 's';
+    }
+  });
+  window.mainTl = mainTl; // 暴露给外部控制
+
+  let t = 0;
+  scenes.forEach((sc, i) => {
+    mainTl.call(() => {
+      currentIdx = i;
+      hudNum.innerText = i + 1;
+      hudText.innerText = sc.text;
+      progScene.innerText = (i + 1) + ' / ' + scenes.length;
+      
+      // 平滑滚动 HUD 文本
+      const clipH = document.getElementById('hud-clip').clientHeight;
+      const textH = hudText.scrollHeight;
+      const overflow = textH - clipH;
+      gsap.killTweensOf(hudText);
+      gsap.set(hudText, { y: 0 });
+      if (overflow > 2) {
+        gsap.to(hudText, {
+          y: -overflow,
+          duration: sc.dur * 0.85,
+          ease: 'power1.inOut',
+          delay: sc.dur * 0.08
+        });
+      }
+      
+      // 常驻进度指示器状态更新
+      updateIndicator(i + 1);
+
+      // 场景显隐切换
+      document.querySelectorAll('.g-scene').forEach((el, idx) => {
+        if (idx === i) {
+          el.classList.add('active');
+          gsap.to(el, { opacity: 1, duration: 0.4 });
+        } else {
+          el.classList.remove('active');
+          gsap.to(el, { opacity: 0, duration: 0.3 });
+        }
+      });
+      
+      // 触发该场专属动效
+      playSceneAnimation(i + 1, sc.dur);
+    }, null, t);
+    
+    t += sc.dur;
+  });
+}
+
+// 指示器状态
+function updateIndicator(sceneNum) {
+  const d1 = document.getElementById('dot-s1');
+  const d2 = document.getElementById('dot-s2');
+  const d3 = document.getElementById('dot-s3');
+  
+  [d1, d2, d3].forEach(d => d.classList.remove('active'));
+  
+  if (sceneNum <= 8) {
+    d1.classList.add('active');
+  } else if (sceneNum <= 14) {
+    d2.classList.add('active');
+  } else {
+    d3.classList.add('active');
+  }
+}
+
+// 播放具体场景动画
+function playSceneAnimation(num, dur) {
+  // 停止所有后台循环/重复播放的动画，彻底消除横线和多余动画在切换时的残留Bug
+  gsap.killTweensOf(['#s3-flow-light', '#s3-connect-line', '#s6-pipe-active', '#s6-pipe', '#s9-pipe-active', '#s9-pipe', '#s15-barbell svg', '#s18-wrap > div:first-child', '#s19b-pulse']);
+
+  // 每次触发重置所有 SVG 线条与显示组
+  gsap.set(['#s3-connect-line', '#s3-flow-light', '#s6-pipe', '#s6-pipe-active', '#s9-pipe', '#s9-pipe-active'], { opacity: 0 });
+  gsap.set('#s3-connect-group', { display: 'none', opacity: 0 });
+
+  const isPortrait = window.innerWidth < window.innerHeight;
+  
+  // 根据屏幕比例动态设置 SVG 管线属性，使连线完美适配竖屏
+  if (isPortrait) {
+    gsap.set('#s3-connect-line', { attr: { x1: 320, y1: 400, x2: 320, y2: 700 } });
+    gsap.set('#s3-flow-light', { attr: { d: 'M 320,400 L 320,700' } });
+    
+    gsap.set('#s6-pipe', { attr: { d: 'M 320,400 C 260,480 260,640 320,720' } });
+    gsap.set('#s6-pipe-active', { attr: { d: 'M 320,400 C 260,480 260,640 320,720' } });
+
+    gsap.set('#s9-pipe', { attr: { d: 'M 320,400 L 320,520' } });
+    gsap.set('#s9-pipe-active', { attr: { d: 'M 320,400 L 320,520' } });
+  } else {
+    gsap.set('#s3-connect-line', { attr: { x1: 330, y1: 320, x2: 570, y2: 320 } });
+    gsap.set('#s3-flow-light', { attr: { d: 'M 330,320 L 570,320' } });
+    
+    gsap.set('#s6-pipe', { attr: { d: 'M 300,320 C 380,240 520,240 600,320' } });
+    gsap.set('#s6-pipe-active', { attr: { d: 'M 300,320 C 380,240 520,240 600,320' } });
+
+    gsap.set('#s9-pipe', { attr: { d: 'M 450,220 L 450,300' } });
+    gsap.set('#s9-pipe-active', { attr: { d: 'M 450,220 L 450,300' } });
+  }
+
+  if (num === 1) {
+    gsap.fromTo('#s1-key', { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.7, ease: 'back.out(1.6)' });
+  } 
+  else if (num === 2) {
+    // 自动无序堆叠卡片，制造凌乱的“上千条笔记卡片”
+    const wrap = document.getElementById('s2-cards-wrap');
+    wrap.innerHTML = '';
+    gsap.set(wrap, { opacity: 1 });
+    
+    // 生成 12 个随机堆叠的笔记微缩卡片
+    for(let i=0; i<12; i++) {
+      const card = document.createElement('div');
+      card.style.position = 'absolute';
+      card.style.width = '120px';
+      card.style.height = '70px';
+      card.style.background = 'rgba(7, 10, 19, 0.9)';
+      card.style.border = '1px solid rgba(0, 255, 240, 0.2)';
+      card.style.left = (Math.random() * 160 + 80) + 'px';
+      card.style.top = (Math.random() * 100 + 60) + 'px';
+      card.style.transform = `rotate(${(Math.random() - 0.5) * 30}deg) scale(0)`;
+      card.style.padding = '6px';
+      card.style.fontSize = '8px';
+      card.style.color = 'rgba(0, 255, 240, 0.6)';
+      card.innerHTML = `📄 Note_${i+1}.md<br>---<br>#idea #collect`;
+      wrap.appendChild(card);
+      
+      gsap.to(card, {
+        scale: 1,
+        rotation: (Math.random() - 0.5) * 40,
+        duration: 0.4,
+        delay: i * 0.1,
+        ease: 'back.out(1.2)'
+      });
+    }
+    // 灰尘覆盖层渐显
+    gsap.fromTo('#s2-dust-overlay', { opacity: 0 }, { opacity: 1, duration: 0.8, delay: 1.5 });
+  } 
+  else if (num === 3) {
+    gsap.fromTo('#s3-human', { x: -60, opacity: 0 }, { x: 0, opacity: 1, duration: 0.6 });
+    gsap.fromTo('#s3-robot', { x: 60, opacity: 0 }, { x: 0, opacity: 1, duration: 0.6 });
+    
+    // 显示并激活连接线组，防止在其他分镜中残留
+    gsap.set('#s3-connect-group', { display: 'block', opacity: 1 });
+    gsap.to('#s3-connect-line', { opacity: 0.4, duration: 0.4, delay: 0.5 });
+    gsap.fromTo('#s3-flow-light', 
+      { strokeDashoffset: 100, opacity: 0 }, 
+      { strokeDashoffset: 0, opacity: 1, duration: 1.5, repeat: -1, ease: 'none', delay: 0.6 }
+    );
+  } 
+  else if (num === 4) {
+    gsap.fromTo('#s4-flowchart', { x: 100, opacity: 0 }, { x: 0, opacity: 1, duration: 0.8, ease: 'power3.out' });
+  } 
+  else if (num === 5) {
+    gsap.fromTo('#s5-icon', { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: 'back.out(1.5)' });
+  } 
+  else if (num === 6) {
+    gsap.fromTo('#s6-left', { x: -30, opacity: 0 }, { x: 0, opacity: 1, duration: 0.6 });
+    gsap.fromTo('#s6-right', { x: 30, opacity: 0 }, { x: 0, opacity: 1, duration: 0.6, delay: 0.2 });
+    
+    // 指向连线流动
+    gsap.to('#s6-pipe', { opacity: 0.4, duration: 0.4, delay: 0.5 });
+    gsap.fromTo('#s6-pipe-active', 
+      { strokeDashoffset: 150, opacity: 0 }, 
+      { strokeDashoffset: 0, opacity: 1, duration: 1.2, ease: 'power1.inOut', delay: 0.6 }
+    );
+  } 
+  else if (num === 7) {
+    gsap.set(['#s7-p1', '#s7-p2', '#s7-p3'], { scale: 1, opacity: 1, x: 0, y: 0 });
+    gsap.set('#s7-package', { scale: 0.7, opacity: 0 });
+    
+    // 散落笔记飞入并打包
+    gsap.fromTo('#s7-p1', { x: -100, y: -80, opacity: 0 }, { x: 120, y: 130, opacity: 0.4, duration: 0.8 });
+    gsap.fromTo('#s7-p2', { x: 100, y: -80, opacity: 0 }, { x: -120, y: 130, opacity: 0.4, duration: 0.8 });
+    gsap.fromTo('#s7-p3', { y: -120, opacity: 0 }, { y: 190, opacity: 0.4, duration: 0.8 });
+    
+    // 打包盒弹出并闪烁一次
+    gsap.to('#s7-package', { scale: 1, opacity: 1, duration: 0.5, delay: 0.8, ease: 'back.out(1.5)' });
+    gsap.to('#s7-package', { borderColor: '#ffffff', repeat: 1, yoyo: true, duration: 0.15, delay: 1.3 });
+  } 
+  else if (num === 8) {
+    // 闭环路径画圆
+    gsap.fromTo('#s8-circle-wrap', { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5 });
+    gsap.fromTo('#s8-circle-path', { strokeDashoffset: 628 }, { strokeDashoffset: 0, duration: 2.2, ease: 'power2.inOut', delay: 0.3 });
+  } 
+  else if (num === 9) {
+    // 终端解锁
+    gsap.fromTo('#s9-unlock', { scale: 0.7, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: 'back.out(1.5)' });
+    gsap.to('#s9-unlock', { boxShadow: '0 0 35px #00FFF0', repeat: 3, yoyo: true, duration: 0.3, delay: 0.6 });
+  } 
+  else if (num === 10) {
+    // 三色文件夹 staggered
+    gsap.set('#s10-folders-wrap', { opacity: 1 });
+    const folders = document.querySelectorAll('#s10-folders-wrap > div');
+    folders.forEach((f, idx) => {
+      gsap.fromTo(f, { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, delay: idx * 0.25, ease: 'back.out(1.4)' });
+    });
+  } 
+  else if (num === 11) {
+    gsap.fromTo('#s11-box', { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: 'back.out(1.5)' });
+  } 
+  else if (num === 12) {
+    // 唤醒终端
+    gsap.set(['#s12-line2', '#s12-line3'], { opacity: 0 });
+    gsap.fromTo('#s12-terminal', { y: 60, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, ease: 'power3.out' });
+    gsap.to('#s12-line2', { opacity: 1, duration: 0.2, delay: 1.0 });
+    gsap.to('#s12-line3', { opacity: 1, duration: 0.2, delay: 1.5 });
+  } 
+  else if (num === 13) {
+    // 气泡输入打字机
+    const txt = '“把 raw 里的新资料导入 wiki”';
+    const cEl = document.getElementById('s13-typed-cmd');
+    cEl.innerHTML = '';
+    
+    gsap.fromTo('#s13-bubble', { scale: 0.9, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: 'back.out(1.2)' });
+    
+    let idx = 0;
+    const timer = setInterval(() => {
+      if (idx < txt.length) {
+        cEl.innerHTML += txt[idx];
+        idx++;
+      } else {
+        clearInterval(timer);
+      }
+    }, 80);
+  } 
+  else if (num === 14) {
+    // 两个卡片及索引更新
+    gsap.set('#s14-index-append', { backgroundColor: 'transparent', color: '#ff2d78' });
+    gsap.fromTo('#s14-wrap', { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6 });
+    gsap.to('#s14-index-append', { backgroundColor: 'rgba(255,215,0,0.25)', color: '#ffd700', duration: 0.4, delay: 1.2 });
+  } 
+  else if (num === 15) {
+    // 杠铃摇摆
+    gsap.fromTo('#s15-barbell', { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: 'back.out(1.5)' });
+    gsap.to('#s15-barbell svg', { rotation: 8, duration: 1.5, yoyo: true, repeat: -1, ease: 'sine.inOut', delay: 0.6 });
+  } 
+  else if (num === 16) {
+    // 防御光罩挡飞点
+    gsap.set('.s16-shatter-dot', { opacity: 1, x: 0, y: 0 });
+    gsap.fromTo('#s16-shield-wrap', { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5 });
+    
+    // 三个污染小对话气泡撞向光罩并弹回
+    const dots = document.querySelectorAll('.s16-shatter-dot');
+    const targets = [{ x: 50, y: 40 }, { x: -40, y: -30 }, { x: -20, y: -60 }];
+    
+    dots.forEach((dot, idx) => {
+      gsap.to(dot, {
+        x: targets[idx].x,
+        y: targets[idx].y,
+        duration: 0.8,
+        delay: 0.5,
+        ease: 'power2.out',
+        onComplete: () => {
+          // 产生碰撞火花 (发光闪烁)
+          gsap.to('#s16-shield', { borderColor: '#ffffff', duration: 0.15, repeat: 1, yoyo: true });
+          // 反向弹开并淡出
+          gsap.to(dot, {
+            x: targets[idx].x * -0.5,
+            y: targets[idx].y * -0.5,
+            opacity: 0,
+            duration: 0.5,
+            ease: 'power2.in'
+          });
+        }
+      });
+    });
+  } 
+  else if (num === 17) {
+    gsap.fromTo('#s17-box', { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: 'back.out(1.5)' });
+  } 
+  else if (num === 18) {
+    gsap.fromTo('#s18-wrap', { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 0.6 });
+    // 漏斗上下浮动
+    gsap.to('#s18-wrap > div:first-child', { y: '-=10', duration: 1.5, yoyo: true, repeat: -1, ease: 'sine.inOut' });
+  } 
+  else if (num === 19) {
+    gsap.fromTo('#s19a-flow', { y: 20, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6 });
+  } 
+  else if (num === 20) {
+    gsap.fromTo('#s19b-pulse', { scale: 0.6, opacity: 0 }, { scale: 1.05, opacity: 1, duration: 0.5, ease: 'back.out(1.5)' });
+    gsap.to('#s19b-pulse', { scale: 1.0, duration: 1.2, repeat: -1, yoyo: true, ease: 'sine.inOut', delay: 0.5 });
+  } 
+  else if (num === 21) {
+    gsap.fromTo('#s20-cta', { scale: 0.9, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: 'back.out(1.4)' });
+  }
+}
+
+// 键盘切换
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') {
+    if (mainTl.paused()) mainTl.play(); else mainTl.pause();
+  } else if (e.code === 'ArrowRight') {
+    if (currentIdx < scenes.length - 1) {
+      let t = 0;
+      for (let i = 0; i <= currentIdx; i++) t += scenes[i].dur;
+      mainTl.seek(t);
+    }
+  } else if (e.code === 'ArrowLeft') {
+    if (currentIdx > 0) {
+      let t = 0;
+      for (let i = 0; i < currentIdx - 1; i++) t += scenes[i].dur;
+      mainTl.seek(t);
+    }
+  }
+});
+
+// Vue3 父页面控制通信 postMessage
+window.addEventListener('message', (e) => {
+  if (!e.data || !mainTl) return;
+  const { type, speed } = e.data;
+  if (type === 'togglePlay') mainTl.paused() ? mainTl.play() : mainTl.pause();
+  if (type === 'restart') mainTl.restart();
+  if (type === 'setSpeed') mainTl.timeScale(speed);
+});
+
+// 全屏控制
+function toggleFullScreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(err => {
+      console.error(`全屏模式启用失败: ${err.message}`);
+    });
+  } else {
+    document.exitFullscreen();
+  }
+}
+
+// 启动
+document.addEventListener('DOMContentLoaded', () => {
+  window.playSceneAnimation = playSceneAnimation;
+  initCanvas();
+  adjustScale();
+  window.addEventListener('resize', adjustScale);
+  buildDirectorTimeline();
+});
+</script>
+
+<script>
+  (function() {
+    const sceneSuffix = "15";
+    const sceneNum = 15;
+    
+    function initHyperframesTimeline() {
+      if (typeof gsap === 'undefined' || typeof playSceneAnimation === 'undefined') {
+        setTimeout(initHyperframesTimeline, 10);
+        return;
+      }
+      
+      // Force display the scene element
+      const targetScene = document.getElementById("sc-" + sceneSuffix);
+      if (targetScene) {
+        targetScene.style.setProperty("opacity", "1", "important");
+        targetScene.style.setProperty("display", "flex", "important");
+      }
+      
+      // Stop any background mainTl
+      if (window.mainTl) {
+        window.mainTl.pause();
+      }
+      
+      // Clear root timeline of any initial setup tweens
+      const dummy = gsap.exportRoot();
+      dummy.pause();
+      
+      // Trigger scene animation explicitly
+      playSceneAnimation(sceneNum, 7.0);
+      
+      // Export all scene tweens into a single root timeline
+      const rootTl = gsap.exportRoot();
+      rootTl.pause();
+      
+      window.__timelines = window.__timelines || {};
+      window.__timelines["root"] = rootTl;
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initHyperframesTimeline);
+    } else {
+      initHyperframesTimeline();
+    }
+  })();
+</script>
+        
+</body>
+</html>

@@ -37,6 +37,12 @@ const favoriteLinks = ref([
     description: "代码托管平台",
     url: "https://github.com/",
   },
+  {
+    id: 4,
+    name: "cliproxyapi",
+    description: "CLI Proxy API 管理后台",
+    url: "https://cli.huabenwuxin.com/management.html",
+  },
   // 添加更多收藏链接
 ]);
 </script>

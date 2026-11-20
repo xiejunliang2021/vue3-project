@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>分镜 1: 钩子对比 (¥200 vs ¥20,000)</title>
+  <style>
+    :root {
+      --bg: #060913;
+      --green: #39ff14;
+      --red: #ff3b3b;
+      --cyan: #00fff0;
+      --magenta: #ff2d78;
+      --blue: #00b3ff;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg);
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Courier New', Courier, monospace;
+      color: #ffffff;
+    }
+    #stage {
+      position: relative;
+      width: 900px;
+      height: 640px;
+      background: #060913;
+      border: 2px solid #1a233d;
+      box-shadow: 0 0 20px rgba(0, 243, 255, 0.1);
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+    .cyber-card {
+      position: absolute;
+      border: 2px solid var(--border-color, #1a233d);
+      background: rgba(6, 9, 19, 0.95);
+      padding: 15px;
+      box-sizing: border-box;
+      box-shadow: 0 0 15px var(--glow-color, rgba(0, 243, 255, 0.15));
+      border-radius: 4px;
+    }
+    .font-mono {
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+    }
+  </style>
+  <script type="text/javascript" src="js/gsap.min.js"></script>
+</head>
+<body>
+  <div id="stage" data-composition-id="root" data-start="0" data-duration="5" data-width="900" data-height="640">
+    
+      <div id="card-left" class="cyber-card font-mono" style="left: 100px; top: 200px; width: 300px; --border-color: var(--green); --glow-color: rgba(57, 255, 20, 0.3);">
+        <div style="font-size: 18px; color: #888;">AI员工</div>
+        <div style="font-size: 36px; color: var(--green); margin-top: 10px;">¥200/mo</div>
+      </div>
+      <div id="card-right" class="cyber-card font-mono" style="right: 100px; top: 200px; width: 300px; --border-color: var(--red); --glow-color: rgba(255, 59, 59, 0.3);">
+        <div style="font-size: 18px; color: #888;">真人虚拟助理</div>
+        <div style="font-size: 36px; color: var(--red); margin-top: 10px;">¥20,000/mo</div>
+      </div>
+      <div id="equal-sign" style="position: absolute; left: 425px; top: 240px; font-size: 64px; color: var(--cyan); text-shadow: 0 0 15px var(--cyan); opacity: 0; transform: scaleX(0); font-weight: bold;">=</div>
+      <div id="subtitle" style="position: absolute; bottom: 50px; left: 50px; right: 50px; text-align: center; font-size: 24px; color: #fff;">一个AI员工，月薪200块。干的活，一模一样。</div>
+
+  </div>
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tl = gsap.timeline({ paused: true });
+    
+    
+    tl.fromTo("#card-left", {scale: 0, y: 50, opacity: 0}, {scale: 1, y: 0, opacity: 1, ease: "back.out(2)", duration: 0.8}, 0.2);
+    tl.fromTo("#card-right", {scale: 0, y: 50, opacity: 0}, {scale: 1, y: 0, opacity: 1, ease: "power4.out", duration: 0.6}, 1.2);
+    tl.fromTo("#equal-sign", {scaleX: 0, opacity: 0}, {scaleX: 1, opacity: 1, ease: "power2.out", duration: 0.5}, 2.0);
+    tl.fromTo("#subtitle", {opacity: 0}, {opacity: 1, duration: 0.5}, 0.2);
+
+    
+    window.__timelines["root"] = tl;
+    
+    window.addEventListener('message', (e) => {
+      if (!e.data) return;
+      if (e.data.type === 'togglePlay') {
+        if (tl.paused()) tl.play(); else tl.pause();
+      } else if (e.data.type === 'restart') {
+        tl.restart();
+      } else if (e.data.type === 'setSpeed') {
+        tl.timeScale(e.data.speed);
+      }
+    });
+  </script>
+</body>
+</html>

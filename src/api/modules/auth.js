@@ -11,6 +11,16 @@ export function login(username, password) {
     })
 }
 
+export function loginByKey(key) {
+    return request({
+        url: '/api/auth/login_by_key/',
+        method: 'post',
+        data: {
+            key
+        }
+    })
+}
+
 export function logout() {
     return request({
         url: '/api/auth/logout/',

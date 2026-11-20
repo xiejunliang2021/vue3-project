@@ -1,0 +1,1586 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>别再出卖劳动力 — 44场全景动效导演系统</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0f1d;
+    color: #00FFF0;
+    font-family: 'Courier New', Consolas, monospace;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+  
+  /* 基础背景与画布 */
+  #main-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+  #grid-bg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background-image: 
+      linear-gradient(rgba(0, 255, 240, 0.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 255, 240, 0.015) 1px, transparent 1px);
+    background-size: 30px 30px;
+    pointer-events: none;
+  }
+  #flash-overlay { position: fixed; inset: 0; background: #fff; z-index: 99; opacity: 0; pointer-events: none; }
+
+  /* 提词器 HUD */
+  #hud {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    width: 90vw;
+    max-width: 760px;
+    background: rgba(10, 15, 29, 0.95);
+    border: 2px solid rgba(0, 255, 240, 0.4);
+    border-radius: 14px;
+    padding: 12px 20px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 0 30px rgba(0, 255, 240, 0.2);
+  }
+  #hud-label {
+    font-size: 10px;
+    color: rgba(0, 255, 240, 0.6);
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+  }
+  #hud-clip { height: calc(1.5em * 2); overflow: hidden; position: relative; }
+  #hud-text {
+    font-size: 13px;
+    line-height: 1.5;
+    color: #ddfff8;
+    font-family: sans-serif;
+    display: block;
+    position: absolute;
+    width: 100%;
+  }
+
+  /* 舞台 */
+  #stage {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  /* 双层解耦容器：外层 stage-scaler 负责响应式缩放，内层 scene-container (visual-board) 负责 GSAP 镜头变焦与位移 */
+  #stage-scaler {
+    position: relative;
+    width: 900px;
+    height: 640px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform-origin: center center;
+  }
+  
+  .scene-container {
+    position: relative;
+    width: 900px;
+    height: 640px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform-style: preserve-3d;
+    perspective: 1000px;
+    transform-origin: center center;
+  }
+
+  /* 赛博粗野主义与玻璃拟态规范 */
+  .brut-card {
+    background: #fff;
+    color: #000;
+    border: 3px solid #000;
+    padding: 16px;
+    border-radius: 10px;
+    box-shadow: 6px 6px 0px #000;
+    opacity: 0;
+    position: absolute;
+    font-weight: bold;
+    z-index: 10;
+  }
+  .glass-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    padding: 16px;
+    color: #ddfff8;
+    position: absolute;
+    opacity: 0;
+    z-index: 5;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  }
+  
+  /* 辉光颜色 */
+  .glow-cyan { box-shadow: 6px 6px 0px #000, 0 0 20px rgba(0, 255, 240, 0.6); border-color: #00fff0; }
+  .glow-magenta { box-shadow: 6px 6px 0px #000, 0 0 20px rgba(255, 45, 120, 0.6); border-color: #ff2d78; }
+  .glow-green { box-shadow: 6px 6px 0px #000, 0 0 20px rgba(57, 255, 20, 0.6); border-color: #39ff14; }
+  .glow-blue { box-shadow: 6px 6px 0px #000, 0 0 20px rgba(0, 179, 255, 0.6); border-color: #00b3ff; }
+
+  /* ================= 场景专用样式与位置 ================= */
+  
+  /* S01: 剪影与公转 */
+  .s1-silhouette {
+    position: absolute;
+    width: 140px;
+    height: 140px;
+    left: 380px;
+    top: 250px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 50%;
+    border: 2px dashed rgba(0, 255, 240, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 64px;
+    opacity: 0;
+  }
+  .s1-orbit-wrap {
+    position: absolute;
+    width: 320px;
+    height: 320px;
+    left: 290px;
+    top: 160px;
+    border: 1px dashed rgba(0, 255, 240, 0.15);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+  }
+  .s1-orbit-node {
+    position: absolute;
+    width: 42px;
+    height: 42px;
+    background: rgba(10, 15, 29, 0.9);
+    border: 2px solid #00fff0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    box-shadow: 0 0 10px rgba(0, 255, 240, 0.5);
+  }
+
+  /* S02: 四个分裂浮窗定位 */
+  #s2-card1 { width: 240px; left: 80px; top: 120px; }
+  #s2-card2 { width: 240px; right: 80px; top: 120px; }
+  #s2-card3 { width: 240px; left: 80px; bottom: 120px; }
+  #s2-card4 { width: 240px; right: 80px; bottom: 120px; }
+
+  /* S04: 打字机与细线 */
+  .s4-title {
+    font-size: 42px;
+    font-weight: 900;
+    color: #00fff0;
+    text-shadow: 0 0 15px rgba(0, 255, 240, 0.8);
+    opacity: 0;
+    position: absolute;
+    left: 50%;
+    top: 40%;
+    transform: translate(-50%, -50%);
+  }
+  .s4-line {
+    position: absolute;
+    height: 2px;
+    width: 300px;
+    background: #ff2d78;
+    box-shadow: 0 0 10px #ff2d78;
+    transform: scaleX(0);
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  /* S05: 地图 */
+  #s5-map { width: 560px; height: 280px; opacity: 0; position: absolute; left: 170px; top: 180px; }
+  .map-point { position: absolute; width: 12px; height: 12px; background: #39ff14; border-radius: 50%; box-shadow: 0 0 12px #39ff14; opacity: 0; }
+
+  /* S06: 团队与VPS */
+  .s6-team-box { position: absolute; width: 450px; height: 200px; left: 225px; top: 120px; display: flex; justify-content: space-around; align-items: center; opacity: 0; }
+  .s6-vps-box { position: absolute; width: 220px; height: 220px; left: 340px; top: 210px; opacity: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .cross-line { position: absolute; height: 4px; background: #ff2d78; box-shadow: 0 0 8px #ff2d78; width: 0%; transform: rotate(15deg); }
+
+  /* S07: 陀螺与 logo */
+  .s7-top {
+    position: absolute;
+    width: 120px;
+    height: 120px;
+    left: 390px;
+    top: 260px;
+    border: 3px solid #ff2d78;
+    transform: rotate(45deg) scale(0);
+    opacity: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 25px rgba(255, 45, 120, 0.4);
+  }
+  .s7-inner { transform: rotate(-45deg); font-size: 40px; }
+  .s7-logo {
+    position: absolute;
+    width: 36px;
+    height: 36px;
+    background: rgba(10, 15, 29, 0.9);
+    border: 2px solid #00fff0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    box-shadow: 0 0 10px #00fff0;
+  }
+  .s7-salary { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); font-size: 28px; font-weight: 900; color: #ff2d78; text-shadow: 0 0 10px #ff2d78; opacity: 0; }
+
+  /* S08: 搜索框 */
+  .s8-search {
+    position: absolute;
+    width: 460px;
+    height: 54px;
+    left: 220px;
+    top: 293px;
+    background: rgba(10, 15, 29, 0.85);
+    border: 2px solid rgba(0, 255, 240, 0.5);
+    border-radius: 27px;
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    font-size: 16px;
+    color: #ddfff8;
+    box-shadow: 0 0 20px rgba(0, 255, 240, 0.2);
+    opacity: 0;
+  }
+  .cursor { width: 2px; height: 18px; background: #00fff0; margin-left: 4px; animation: blink 1s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* S09: 遗忘气泡 */
+  #s9-bubble { left: 310px; top: 260px; width: 280px; }
+
+  /* S10: 分屏 */
+  .s10-split { position: absolute; width: 700px; height: 350px; left: 100px; top: 145px; display: flex; opacity: 0; }
+  .s10-half { flex: 1; border: 2px dashed rgba(255, 255, 255, 0.15); display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; padding: 20px; }
+  .s10-evolution { position: relative; width: 120px; height: 120px; border-radius: 50%; border: 3px solid #39ff14; display: flex; align-items: center; justify-content: center; font-size: 32px; box-shadow: 0 0 20px rgba(57, 255, 20, 0.4); }
+
+  /* S12: 数字分身 */
+  .s12-twin { position: absolute; width: 180px; height: 180px; left: 360px; top: 230px; border: 2px solid #00fff0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 72px; opacity: 0; box-shadow: 0 0 30px rgba(0, 255, 240, 0.4); }
+  .s12-clock { position: absolute; width: 280px; height: 280px; left: 310px; top: 180px; border: 1px dashed rgba(0, 255, 240, 0.3); border-radius: 50%; opacity: 0; }
+
+  /* S13: 三立柱 */
+  .s13-pillar {
+    width: 130px;
+    height: 200px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 3px solid #000;
+    border-radius: 12px;
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+  }
+  .s14-db-drawer { width: 80px; height: 20px; background: rgba(0, 255, 240, 0.2); border: 1.5px solid #00fff0; margin: 4px 0; border-radius: 4px; opacity: 0; }
+
+  /* S15: 气泡与重置 */
+  #s15-b1 { left: 160px; top: 120px; }
+  #s15-b2 { right: 160px; top: 240px; }
+  .s15-bubble { background: #fff; color: #000; padding: 12px 18px; border: 3px solid #000; border-radius: 10px; position: absolute; max-width: 220px; font-size: 12px; opacity: 0; box-shadow: 4px 4px 0px #000; }
+  .s15-reset { position: absolute; left: 380px; top: 280px; width: 140px; text-align: center; font-size: 40px; color: #ff2d78; opacity: 0; z-index: 12; }
+
+  /* S16: X 与 徽章 */
+  .s16-cross { position: absolute; left: 360px; top: 220px; width: 180px; text-align: center; font-size: 160px; color: #ff2d78; text-shadow: 0 0 20px #ff2d78; opacity: 0; z-index: 15; }
+  .s16-badge { position: absolute; width: 140px; height: 140px; left: 380px; top: 250px; background: rgba(10, 15, 29, 0.9); border: 3px solid #00fff0; transform: rotate(45deg); display: flex; align-items: center; justify-content: center; opacity: 0; box-shadow: 0 0 30px rgba(0, 255, 240, 0.6); }
+  .s16-badge-inner { transform: rotate(-45deg); text-align: center; color: #fff; font-weight: 900; }
+
+  /* S17: 存档卡片 */
+  #s17-c1 { left: 200px; top: 60px; }
+  #s17-c2 { left: 350px; top: 40px; }
+  #s17-c3 { left: 500px; top: 70px; }
+  .s17-card { background: #fff; color: #000; border: 2px solid #000; padding: 6px 12px; border-radius: 6px; box-shadow: 3px 3px 0 #000; font-size: 11px; position: absolute; opacity: 0; font-weight: bold; }
+  .s17-db { position: absolute; width: 120px; height: 100px; left: 390px; top: 380px; border: 3px solid #00fff0; background: rgba(10, 15, 29, 0.9); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 0 20px rgba(0, 255, 240, 0.4); opacity: 0; }
+
+  /* S18: 对话预填 */
+  .s18-chat { position: absolute; width: 320px; height: 180px; left: 290px; top: 230px; border: 2px solid rgba(0, 255, 240, 0.4); border-radius: 8px; background: rgba(10, 15, 29, 0.9); padding: 12px; display: flex; flex-direction: column; justify-content: space-between; opacity: 0; }
+  .s18-input { width: 100%; height: 32px; border: 1px solid rgba(0, 255, 240, 0.3); border-radius: 4px; background: rgba(0, 0, 0, 0.3); padding: 0 8px; font-size: 11px; display: flex; align-items: center; }
+
+  /* S20: 3个任务卡片压缩 */
+  #s20-t1 { left: 150px; top: 180px; }
+  #s20-t2 { left: 150px; top: 250px; }
+  #s20-t3 { left: 150px; top: 320px; }
+  .s20-task { background: #fff; color: #000; border: 2px solid #000; padding: 8px 16px; border-radius: 6px; position: absolute; font-size: 12px; opacity: 0; box-shadow: 4px 4px 0 #000; font-weight: bold; }
+  .s20-badge { position: absolute; width: 90px; height: 90px; left: 405px; top: 275px; background: #ff2d78; border: 3px solid #fff; transform: rotate(45deg); display: flex; align-items: center; justify-content: center; opacity: 0; box-shadow: 0 0 20px #ff2d78; }
+
+  /* S21: 流程图 */
+  .s21-pipeline { position: absolute; width: 550px; height: 100px; left: 175px; top: 270px; display: flex; justify-content: space-between; align-items: center; opacity: 0; }
+  .s21-node { width: 44px; height: 44px; border-radius: 50%; background: #000; border: 2px solid #ff2d78; display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 0 10px rgba(255, 45, 120, 0.5); transform: scale(0); }
+
+  /* S22: 眼睛 */
+  .s22-eye { position: absolute; left: 410px; top: 280px; width: 80px; text-align: center; font-size: 80px; opacity: 0; text-shadow: 0 0 20px rgba(0, 255, 240, 0.8); }
+
+  /* S25: 七点工作流 */
+  .s25-flow { position: absolute; width: 720px; height: 120px; left: 90px; top: 260px; display: flex; justify-content: space-between; align-items: center; opacity: 0; }
+  .s25-node { width: 48px; height: 48px; border-radius: 50%; background: #000; border: 2px solid #00b3ff; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 0 10px rgba(0, 179, 255, 0.5); transform: scale(0); }
+  .s25-noti { background: #fff; color: #000; border: 2px solid #000; border-radius: 8px; padding: 6px 12px; font-size: 10px; position: absolute; bottom: -40px; width: 140px; text-align: center; opacity: 0; box-shadow: 3px 3px 0 #000; }
+
+  /* S26: Ollama & Billing */
+  #s26-server { position: absolute; width: 180px; height: 140px; left: 180px; top: 220px; border: 2.5px solid #39ff14; border-radius: 8px; background: rgba(10, 15, 29, 0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; box-shadow: 0 0 20px rgba(57, 255, 20, 0.3); }
+  #s26-bill { position: absolute; width: 120px; height: 120px; right: 180px; top: 220px; border: 2.5px solid #ff2d78; background: #fff; color: #000; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; box-shadow: 6px 6px 0 #000; }
+
+  /* S27: 黑盒 */
+  .s27-box { position: absolute; width: 100px; height: 100px; left: 400px; top: 270px; background: #000; border: 3px solid #00fff0; transform: rotate(45deg); display: flex; align-items: center; justify-content: center; opacity: 0; box-shadow: 0 0 25px rgba(0, 255, 240, 0.5); }
+  #s27-q1 { left: 280px; top: 180px; }
+  #s27-q2 { left: 580px; top: 180px; }
+  #s27-q3 { left: 440px; top: 430px; }
+  .s27-q { position: absolute; font-size: 32px; color: #ff2d78; opacity: 0; font-weight: bold; }
+
+  /* S29: 呼叫中心网格 */
+  .s29-grid { position: absolute; width: 680px; height: 360px; left: 110px; top: 140px; opacity: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+  .s29-card { background: rgba(8, 11, 20, 0.9); border: 2.5px solid #ff2d78; border-radius: 8px; padding: 10px; font-size: 10px; text-align: left; display: flex; flex-direction: column; justify-content: space-between; transform: scale(0.8); opacity: 0; box-shadow: 4px 4px 0px #000; }
+  .s29-card-inner { font-weight: 900; margin-bottom: 6px; }
+
+  /* S30: AUTO印章 */
+  .s30-stamp { position: absolute; left: 310px; top: 280px; width: 280px; text-align: center; padding: 12px 30px; border: 4px solid #ff2d78; color: #ff2d78; font-size: 32px; font-weight: 900; background: rgba(10, 15, 29, 0.95); transform: rotate(-15deg) scale(3); opacity: 0; z-index: 20; box-shadow: 0 0 20px #ff2d78; }
+
+  /* S31: 天平 */
+  .s31-scale { position: absolute; width: 420px; height: 200px; left: 240px; top: 220px; opacity: 0; }
+  .s31-beam { position: absolute; width: 100%; height: 6px; background: #ddfff8; top: 80px; left: 0; transform-origin: center; }
+  .s31-plate { position: absolute; width: 100px; height: 10px; background: #00fff0; border-radius: 2px; }
+  .s31-stand { position: absolute; width: 8px; height: 120px; background: #ddfff8; left: 50%; transform: translateX(-50%); top: 80px; }
+
+  /* S32: 传送带 */
+  .s32-belt { position: absolute; width: 600px; height: 120px; left: 150px; top: 260px; border-top: 3px solid #00fff0; border-bottom: 3px solid #00fff0; opacity: 0; display: flex; align-items: center; overflow: hidden; }
+  .s32-belt-bg { position: absolute; inset: 0; background-image: repeating-linear-gradient(90deg, rgba(0,255,240,0.1) 0px, rgba(0,255,240,0.1) 20px, transparent 20px, transparent 40px); width: 200%; height: 100%; }
+  .s32-item { position: absolute; font-size: 32px; }
+
+  /* S33: PARA */
+  .s33-para { position: absolute; width: 680px; height: 340px; left: 110px; top: 140px; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 15px; opacity: 0; }
+  .s33-quad { border: 3px solid #000; background: #fff; color: #000; border-radius: 10px; padding: 16px; text-align: left; font-weight: 900; box-shadow: 6px 6px 0px #000; transform: scale(0.5); opacity: 0; }
+  .s33-node { position: absolute; width: 14px; height: 14px; border-radius: 50%; background: #00fff0; box-shadow: 0 0 8px #00fff0; }
+
+  /* S34: 昼夜分屏 */
+  .s34-split { position: absolute; width: 720px; height: 360px; left: 90px; top: 140px; display: flex; opacity: 0; }
+
+  /* S35: 终端代码 */
+  .s35-diff { position: absolute; width: 500px; height: 260px; left: 200px; top: 190px; background: #000; border: 2px solid #39ff14; border-radius: 8px; padding: 16px; font-family: monospace; font-size: 11px; text-align: left; opacity: 0; overflow: hidden; box-shadow: 0 0 20px rgba(57, 255, 20, 0.4); }
+
+  /* S40: 黄金句卡 */
+  .s40-quote { position: absolute; width: 680px; height: 150px; left: 110px; top: 245px; display: flex; justify-content: space-between; align-items: center; opacity: 0; }
+  .s40-line { width: 3px; height: 100%; background: #ff2d78; box-shadow: 0 0 12px #ff2d78; transform: scaleY(0); }
+
+  /* S41: 韭菜与玩家 */
+  .s41-split { position: absolute; width: 700px; height: 320px; left: 100px; top: 160px; display: flex; opacity: 0; }
+
+  /* S42/43: 蓝图 */
+  .s42-blueprint-class { position: absolute; width: 580px; height: 280px; left: 160px; top: 180px; border: 2px solid rgba(0,255,240,0.2); background: rgba(0,255,240,0.02); display: flex; align-items: center; justify-content: center; opacity: 0; }
+
+  /* S44: CTA 与关注 */
+  .s44-btn { width: 320px; height: 60px; left: 290px; top: 290px; padding: 18px 40px; border-radius: 35px; border: 3.5px solid #000; background: #ffd700; color: #000; font-size: 20px; font-weight: 900; letter-spacing: 2px; position: absolute; cursor: pointer; box-shadow: 8px 8px 0px #000; opacity: 0; transition: transform 0.1s; }
+  .s44-btn:active { transform: translate(4px, 4px); box-shadow: 4px 4px 0px #000; }
+
+  /* ================= 📱 手机端自适应响应式布局媒体查询 ================= */
+  @media (max-width: 768px) {
+    /* 1. 强制容器尺寸响应屏幕 */
+    .scene-container {
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* S01: 剪影居中 */
+    .s1-silhouette {
+      left: 50% !important;
+      top: 35% !important;
+      transform: translate(-50%, -50%) !important;
+    }
+    .s1-orbit-wrap {
+      left: 50% !important;
+      top: 35% !important;
+      transform: translate(-50%, -50%) !important;
+      width: 280px;
+      height: 280px;
+    }
+
+    /* S02: 玻璃浮窗垂直排开，解决重合叠在一起与尺寸过小的致命缺陷 */
+    #s2-card1 { width: 85% !important; left: 7.5% !important; top: 120px !important; right: auto !important; bottom: auto !important; }
+    #s2-card2 { width: 85% !important; left: 7.5% !important; top: 235px !important; right: auto !important; bottom: auto !important; }
+    #s2-card3 { width: 85% !important; left: 7.5% !important; top: 350px !important; right: auto !important; bottom: auto !important; }
+    #s2-card4 { width: 85% !important; left: 7.5% !important; top: 465px !important; right: auto !important; bottom: auto !important; }
+
+    /* S04: 标题 */
+    .s4-title { left: 50% !important; top: 35% !important; width: 90% !important; text-align: center; }
+    .s4-line { left: 50% !important; top: 42% !important; width: 80% !important; }
+
+    /* S05: 地图 */
+    #s5-map { width: 90% !important; height: 200px !important; left: 5% !important; top: 180px !important; }
+
+    /* S06: 团队与VPS */
+    .s6-team-box { width: 90% !important; left: 5% !important; top: 120px !important; flex-direction: column !important; gap: 15px !important; height: auto !important; }
+    .s6-vps-box { left: 50% !important; top: 380px !important; transform: translateX(-50%) !important; }
+
+    /* S07: 陀螺 */
+    .s7-top { left: 50% !important; top: 32% !important; transform: translate(-50%, -50%) !important; }
+    .s7-salary { bottom: 180px !important; }
+
+    /* S08: 搜索 */
+    .s8-search { width: 90% !important; left: 5% !important; top: 260px !important; }
+
+    /* S09: 遗忘气泡 */
+    #s9-bubble { width: 85% !important; left: 7.5% !important; top: 240px !important; }
+
+    /* S10: 左右分屏 */
+    .s10-split { width: 90% !important; height: 420px !important; left: 5% !important; top: 120px !important; flex-direction: column !important; gap: 15px !important; }
+
+    /* S12: 分身与时钟 */
+    .s12-twin { left: 50% !important; top: 32% !important; transform: translate(-50%, -50%) !important; }
+    .s12-clock { left: 50% !important; top: 32% !important; transform: translate(-50%, -50%) !important; }
+
+    /* S13: 三柱垂直堆叠，拉大可视距离 */
+    #s13-p1 { left: 5% !important; top: 110px !important; width: 90% !important; height: 110px !important; flex-direction: row !important; justify-content: space-around !important; }
+    #s13-p2 { left: 5% !important; top: 240px !important; width: 90% !important; height: 110px !important; flex-direction: row !important; justify-content: space-around !important; }
+    #s13-p3 { left: 5% !important; top: 370px !important; width: 90% !important; height: 110px !important; flex-direction: row !important; justify-content: space-around !important; }
+    
+    .s14-db-drawer { width: 60px !important; margin: 0 4px !important; }
+    #s19-helix { margin-top: 0 !important; }
+    #s24-gear { margin-top: 0 !important; }
+
+    /* S15: 气泡 */
+    #s15-b1 { left: 5% !important; top: 120px !important; width: 90% !important; max-width: none !important; }
+    #s15-b2 { left: 5% !important; top: 250px !important; width: 90% !important; max-width: none !important; }
+    .s15-reset { left: 50% !important; top: 380px !important; transform: translateX(-50%) !important; }
+
+    /* S16: Cross & Badge */
+    .s16-cross { left: 50% !important; top: 30% !important; transform: translate(-50%, -50%) !important; }
+    .s16-badge { left: 50% !important; top: 35% !important; transform: translate(-50%, -50%) rotate(45deg) !important; }
+
+    /* S17: 存档与DB */
+    #s17-c1 { left: 5% !important; top: 120px !important; width: 90% !important; }
+    #s17-c2 { left: 5% !important; top: 180px !important; width: 90% !important; }
+    #s17-c3 { left: 5% !important; top: 240px !important; width: 90% !important; }
+    .s17-db { left: 50% !important; top: 360px !important; transform: translateX(-50%) !important; }
+
+    /* S18: Chat */
+    .s18-chat { width: 90% !important; left: 5% !important; top: 180px !important; }
+
+    /* S20: Tasks & Badge */
+    #s20-t1 { left: 5% !important; top: 120px !important; width: 90% !important; }
+    #s20-t2 { left: 5% !important; top: 190px !important; width: 90% !important; }
+    #s20-t3 { left: 5% !important; top: 260px !important; width: 90% !important; }
+    .s20-badge { left: 50% !important; top: 380px !important; transform: translateX(-50%) rotate(45deg) !important; }
+
+    /* S21: Pipeline */
+    .s21-pipeline { width: 90% !important; left: 5% !important; top: 260px !important; }
+
+    /* S22: Eye */
+    .s22-eye { left: 50% !important; top: 35% !important; transform: translate(-50%, -50%) !important; }
+
+    /* S23: Split */
+    #s23-split { width: 90% !important; height: 420px !important; left: 5% !important; top: 120px !important; flex-direction: column !important; gap: 15px !important; }
+
+    /* S25: Flow */
+    .s25-flow { width: 90% !important; left: 5% !important; top: 200px !important; flex-wrap: wrap !important; height: auto !important; gap: 10px !important; justify-content: center !important; }
+    .s25-node { margin: 5px !important; }
+
+    /* S26: Server & Bill */
+    #s26-server { left: 5% !important; top: 120px !important; width: 90% !important; }
+    #s26-bill { right: auto !important; left: 5% !important; top: 280px !important; width: 90% !important; height: 140px !important; }
+
+    /* S27: Box & Question Marks */
+    .s27-box { left: 50% !important; top: 35% !important; transform: translate(-50%, -50%) rotate(45deg) !important; }
+    #s27-q1 { left: 20% !important; top: 20% !important; }
+    #s27-q2 { left: 80% !important; top: 20% !important; }
+    #s27-q3 { left: 50% !important; top: 55% !important; }
+
+    /* S29: 呼叫中心 B2B 网格变成 2 列布局，完全防重叠 */
+    .s29-grid { width: 90% !important; height: auto !important; left: 5% !important; top: 120px !important; grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+
+    /* S30: Stamp */
+    .s30-stamp { left: 50% !important; top: 40% !important; transform: translate(-50%, -50%) rotate(-15deg) !important; }
+
+    /* S31: 天平 */
+    .s31-scale { width: 90% !important; left: 5% !important; top: 200px !important; }
+
+    /* S32: 传送带 */
+    .s32-belt { width: 90% !important; left: 5% !important; top: 240px !important; }
+
+    /* S33: PARA */
+    .s33-para { width: 90% !important; height: auto !important; left: 5% !important; top: 120px !important; grid-template-columns: 1fr !important; gap: 10px !important; }
+
+    /* S34: Split */
+    .s34-split { width: 90% !important; height: 420px !important; left: 5% !important; top: 120px !important; flex-direction: column !important; gap: 15px !important; }
+
+    /* S35: Terminal */
+    .s35-diff { width: 90% !important; left: 5% !important; top: 160px !important; height: 320px !important; }
+
+    /* S40: Quote */
+    .s40-quote { width: 90% !important; left: 5% !important; top: 200px !important; flex-direction: column !important; gap: 20px !important; height: auto !important; }
+    .s40-line { width: 80% !important; height: 3px !important; transform: scaleX(0) !important; }
+
+    /* S41: Split */
+    .s41-split { width: 90% !important; height: 420px !important; left: 5% !important; top: 120px !important; flex-direction: column !important; gap: 15px !important; }
+
+    /* S42: Blueprint */
+    .s42-blueprint-class { width: 90% !important; left: 5% !important; top: 200px !important; }
+
+    /* S44: CTA Button */
+    .s44-btn { width: 90% !important; left: 5% !important; top: 380px !important; }
+  }
+</style>
+</head>
+<body>
+<canvas id="main-canvas"></canvas>
+<div id="grid-bg"></div>
+<div id="flash-overlay"></div>
+
+<div id="hud">
+  <div id="hud-label">
+    <span>SCENE <span id="scene-num">1</span>/44 // 别再出卖劳动力</span>
+    <span id="hud-toggle">▲</span>
+  </div>
+  <div id="hud-content">
+    <div id="hud-clip"><span id="hud-text"></span></div>
+  </div>
+</div>
+
+<div id="stage">
+  <!-- 外层 scaler 实现物理视口等比缩小，内层 visual-board 由 GSAP 操纵变焦位移 -->
+  <div id="stage-scaler">
+    <div class="scene-container" id="visual-board">
+      
+      <!-- 全局 SVG 管道连线，配合 animateMotion 做粒子流 (默认 display: none, 只在特定场景激活) -->
+      <svg id="global-pipes" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2;display:none;">
+        <path id="pipe-s13-1" d="M 185,320 L 450,320" fill="none" stroke="rgba(0,255,240,0.15)" stroke-width="2.5" stroke-dasharray="6 6"/>
+        <path id="pipe-s13-2" d="M 450,320 L 715,320" fill="none" stroke="rgba(0,255,240,0.15)" stroke-width="2.5" stroke-dasharray="6 6"/>
+        
+        <!-- 动态激活管道 (185px 至 715px 间距为 530px) -->
+        <path id="pipe-active" d="M 185,320 L 450,320 L 715,320" fill="none" stroke="#ff2d78" stroke-width="3" stroke-dasharray="530" stroke-dashoffset="530"/>
+      </svg>
+
+      <!-- S01: 真人剪影与公转 -->
+      <div class="s1-silhouette" id="s1-sil">👤</div>
+      <div class="s1-orbit-wrap" id="s1-orbit">
+        <div class="s1-orbit-node" id="s1-ob1">✉️</div>
+        <div class="s1-orbit-node" id="s1-ob2">📅</div>
+        <div class="s1-orbit-node" id="s1-ob3">📊</div>
+        <div class="s1-orbit-node" id="s1-ob4">📁</div>
+      </div>
+
+      <!-- S02: 四个分裂玻璃浮窗 -->
+      <div class="glass-card glow-cyan" id="s2-card1">
+        <h4 style="font-size:12px;color:#00fff0;margin-bottom:4px;">📰 News Feed</h4>
+        <p style="font-size:9px;color:#888;">AI agent revenue hits new record in early 2026...</p>
+      </div>
+      <div class="glass-card glow-cyan" id="s2-card2">
+        <h4 style="font-size:12px;color:#00fff0;margin-bottom:4px;">📋 Todo List</h4>
+        <p style="font-size:9px;color:#888;">[ ] Copy paste spreadsheets<br>[ ] Clean CSV file formats</p>
+      </div>
+      <div class="glass-card glow-cyan" id="s2-card3">
+        <h4 style="font-size:12px;color:#00fff0;margin-bottom:4px;">📊 Competitor</h4>
+        <p style="font-size:9px;color:#888;">Analyzing competitor automation pipelines...</p>
+      </div>
+      <div class="glass-card glow-cyan" id="s2-card4">
+        <h4 style="font-size:12px;color:#00fff0;margin-bottom:4px;">⚡ Ghost Trail</h4>
+        <p style="font-size:9px;color:#888;">Ctrl+C ... Ctrl+V ... Ctrl+C ... Ctrl+V</p>
+      </div>
+
+      <!-- S04: 超级个体标题 -->
+      <h1 class="s4-title" id="s4-title">超级个体时代</h1>
+      <div class="s4-line" id="s4-line"></div>
+
+      <!-- S05: 地图线框 -->
+      <div id="s5-map">
+        <svg viewBox="0 0 560 280" style="width:100%;height:100%;fill:none;stroke:rgba(57,255,20,0.3);stroke-width:2;">
+          <path d="M 50,200 Q 120,60 220,180 T 420,100 T 520,220" />
+          <path d="M 100,240 L 260,110 L 380,210 L 490,70" stroke="rgba(57,255,20,0.15)" />
+        </svg>
+        <div class="map-point" style="left:50px;top:200px;"></div>
+        <div class="map-point" style="left:220px;top:180px;"></div>
+        <div class="map-point" style="left:420px;top:100px;"></div>
+        <div class="map-point" style="left:520px;top:220px;"></div>
+        <div class="brut-card glow-green" id="s5-contract" style="width:280px;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;">
+          <div style="font-size:11px;color:#555;">B2B AI Agent Contract</div>
+          <div style="font-size:24px;font-weight:900;color:#39ff14;" id="s5-value">$0</div>
+          <div style="font-size:10px;color:#888;">SIGNED & SECURED</div>
+        </div>
+      </div>
+
+      <!-- S06: 对比删除线 & VPS -->
+      <div class="s6-team-box" id="s6-team">
+        <div class="brut-card glow-magenta" style="width:180px;position:relative;opacity:1;transform:scale(1);">
+          👥 Heavy Dev Team
+          <div class="cross-line" id="s6-cross1"></div>
+        </div>
+        <div class="brut-card glow-magenta" style="width:180px;position:relative;opacity:1;transform:scale(1);">
+          💾 100,000 Lines Code
+          <div class="cross-line" id="s6-cross2"></div>
+        </div>
+      </div>
+      <div class="s6-vps-box" id="s6-vps">
+        <div style="font-size:80px;">⚡</div>
+        <div class="brut-card glow-cyan" style="width:180px;position:relative;text-align:center;opacity:1;transform:scale(1);">
+          Hostinger VPS
+        </div>
+      </div>
+
+      <!-- S07: 旋转陀螺 & ¥20/hr -->
+      <div class="s7-top" id="s7-top">
+        <div class="s7-inner">🌀</div>
+        <div class="s7-logo" id="s7-l1">🤖</div>
+        <div class="s7-logo" id="s7-l2">💬</div>
+        <div class="s7-logo" id="s7-l3">🔍</div>
+        <div class="s7-logo" id="s7-l4">📧</div>
+      </div>
+      <div class="s7-salary" id="s7-salary">¥20/hr</div>
+
+      <!-- S08: 搜索框 -->
+      <div class="s8-search" id="s8-search">
+        <span style="color:#00fff0;margin-right:8px;">></span>
+        <span id="s8-search-text"></span>
+        <div class="cursor"></div>
+      </div>
+
+      <!-- S09: 遗忘气泡 -->
+      <div class="s15-bubble" id="s9-bubble">
+        <p id="s9-bubble-text"></p>
+      </div>
+
+      <!-- S10: 左右分屏 -->
+      <div class="s10-split" id="s10-split">
+        <div class="s10-half">
+          <div style="font-size:12px;color:#888;margin-bottom:20px;">TRADITIONAL TOOLS</div>
+          <div style="font-size:64px;" id="s10-old-icon">🔄</div>
+          <div style="font-size:14px;color:#ff2d78;margin-top:10px;font-weight:bold;">Looping Shaking</div>
+        </div>
+        <div class="s10-half">
+          <div style="font-size:12px;color:#888;margin-bottom:20px;">HERMES EVOLUTION</div>
+          <div class="s10-evolution" id="s10-new-icon">🧬</div>
+          <div style="font-size:14px;color:#39ff14;margin-top:10px;font-weight:bold;">Active Morphing</div>
+        </div>
+      </div>
+
+      <!-- S11: 融合徽标 -->
+      <div class="brut-card glow-magenta" id="s11-logo" style="width:340px;padding:24px;text-align:center;">
+        <div style="font-size:12px;color:#555;margin-bottom:6px;">THE ULTIMATE COMBINATION</div>
+        <div style="font-size:24px;font-weight:900;letter-spacing:1px;color:#ff2d78;">HERMES ✖ CLAUDE</div>
+        <div style="font-size:10px;color:#666;margin-top:8px;font-family:monospace;">[ Autonomous Coding & Execution Engine ]</div>
+      </div>
+
+      <!-- S12: 数字分身 -->
+      <div class="s12-twin" id="s12-twin">👤</div>
+      <div class="s12-clock" id="s12-clock"></div>
+
+      <!-- S13: 三立柱 -->
+      <div class="s13-pillar glow-cyan" id="s13-p1" style="left:120px;top:220px;">
+        <span style="font-size:28px;margin-bottom:8px;">🔮</span>
+        <strong>Memory</strong>
+        <span style="font-size:9px;color:rgba(0,0,0,0.5);margin-top:4px;">持久记忆</span>
+        <div style="display:flex;flex-direction:column;margin-top:8px;">
+          <div class="s14-db-drawer"></div>
+          <div class="s14-db-drawer"></div>
+          <div class="s14-db-drawer"></div>
+        </div>
+      </div>
+      <div class="s13-pillar glow-magenta" id="s13-p2" style="left:385px;top:220px;">
+        <span style="font-size:28px;margin-bottom:8px;">🧬</span>
+        <strong>Curator</strong>
+        <span style="font-size:9px;color:rgba(0,0,0,0.5);margin-top:4px;">技能进化</span>
+        <div id="s19-helix" style="position:relative;width:60px;height:60px;margin-top:10px;"></div>
+      </div>
+      <div class="s13-pillar glow-blue" id="s13-p3" style="left:650px;top:220px;">
+        <span style="font-size:28px;margin-bottom:8px;">⏰</span>
+        <strong>Cron</strong>
+        <span style="font-size:9px;color:rgba(0,0,0,0.5);margin-top:4px;">定时任务</span>
+        <div id="s24-gear" style="font-size:28px;margin-top:15px;">⚙️</div>
+      </div>
+
+      <!-- S15: 讨厌的对话重置 -->
+      <div class="s15-bubble" id="s15-b1">每次都要说：“你好，我偏好 Python，使用 Tailwind...”</div>
+      <div class="s15-bubble" id="s15-b2">助手：好的，我记住了。但新对话又失效了。</div>
+      <div class="s15-reset" id="s15-reset">🔄 RESET</div>
+
+      <!-- S16: X 划掉与无限徽标 -->
+      <div class="s16-cross" id="s16-cross">❌</div>
+      <div class="s16-badge" id="s16-badge">
+        <div class="s16-badge-inner">
+          <span style="font-size:24px;">♾️</span><br>
+          <strong>HERMES</strong><br>
+          <span style="font-size:10px;">Persistent</span>
+        </div>
+      </div>
+
+      <!-- S17: 存档卡片 -->
+      <div class="s17-card" id="s17-c1">🎨 Tone: Cyberpunk</div>
+      <div class="s17-card" id="s17-c2">🛠️ Config: Vue3 + Vite</div>
+      <div class="s17-card" id="s17-c3">💼 Saily (PARA expert)</div>
+      <div class="s17-db" id="s17-db">
+        📥
+        <div style="font-size:12px;color:#00fff0;margin-top:4px;font-weight:900;">MEMORIES</div>
+      </div>
+
+      <!-- S18: 无缝衔接 -->
+      <div class="s18-chat" id="s18-chat">
+        <div style="font-size:10px;color:rgba(0,255,240,0.6);">[ NEW DIALOGUE SESSION ]</div>
+        <div style="font-size:11px;color:#ddfff8;" id="s18-auto-text">> Autoloading profile configs... DONE.</div>
+        <div class="s18-input">
+          <span style="color:#00fff0;margin-right:6px;">></span>
+          <span id="s18-input-placeholder" style="color:#888;">(Ready, memory loaded...)</span>
+        </div>
+      </div>
+
+      <!-- S20: 3个任务卡片压缩 -->
+      <div class="s20-task" id="s20-t1">Crawler YouTube Script</div>
+      <div class="s20-task" id="s20-t2">Extract Key Metrics</div>
+      <div class="s20-task" id="s20-t3">Notify Telegram Topic</div>
+      <div class="s20-badge" id="s20-badge">
+        <div style="transform:rotate(-45deg);text-align:center;font-weight:bold;font-size:11px;color:#fff;">
+          ⚙️<br>SKILL
+        </div>
+      </div>
+
+      <!-- S21: 点击徽章展开流水线 -->
+      <div class="s21-pipeline" id="s21-pipe">
+        <div class="s21-node" id="s21-n1">📥</div>
+        <div class="s21-node" id="s21-n2">⚙️</div>
+        <div class="s21-node" id="s21-n3">🧠</div>
+        <div class="s21-node" id="s21-n4">📤</div>
+      </div>
+
+      <!-- S22: 眼睛 -->
+      <div class="s22-eye" id="s22-eye">👁️</div>
+
+      <!-- S23: 学工具 vs 工具学你 -->
+      <div class="s10-split" id="s23-split">
+        <div class="s10-half">
+          <span style="font-size:14px;color:#888;margin-bottom:20px;">YOU LEARN TOOL</span>
+          <div style="font-size:48px;position:relative;">
+            📖🤖
+            <div class="cross-line" id="s23-cross" style="width:100%;left:0;top:50%;"></div>
+          </div>
+        </div>
+        <div class="s10-half">
+          <span style="font-size:14px;color:#00fff0;margin-bottom:20px;font-weight:900;">TOOL LEARNS YOU</span>
+          <div style="font-size:52px;" id="s23-check">💖🤖</div>
+        </div>
+      </div>
+
+      <!-- S25: Cron 7:00 流水线 -->
+      <div class="s25-flow" id="s25-flow">
+        <div class="s25-node" id="s25-n1">⏰<br><span style="font-size:8px;color:#00b3ff;">7:00 AM</span></div>
+        <div class="s25-node" id="s25-n2">🕷️<br><span style="font-size:8px;color:#00b3ff;">Scraper</span></div>
+        <div class="s25-node" id="s25-n3">📺<br><span style="font-size:8px;color:#00b3ff;">YouTube</span></div>
+        <div class="s25-node" id="s25-n4">🧠<br><span style="font-size:8px;color:#00b3ff;">Analyze</span></div>
+        <div class="s25-node" id="s25-n5">🔑<br><span style="font-size:8px;color:#00b3ff;">Key</span></div>
+        <div class="s25-node" id="s25-n6" style="position:relative;">
+          ✈️
+          <div class="s25-noti" id="s25-noti">🔔 Telegram: 流量密码已整理！</div>
+        </div>
+      </div>
+
+      <!-- S26: Ollama 本地主机与 $0 账单 -->
+      <div class="s26-server" id="s26-server">
+        <span style="font-size:32px;">🦙</span>
+        <strong style="color:#39ff14;margin-top:6px;font-size:14px;">Ollama Server</strong>
+        <span style="font-size:9px;color:#888;">[ Local & Open Source ]</span>
+      </div>
+      <div class="s26-bill" id="s26-bill">
+        <span style="font-size:32px;">🧾</span>
+        <strong style="color:#ff2d78;margin-top:6px;font-size:14px;">API Invoice</strong>
+        <div style="font-size:18px;font-weight:900;color:#ff2d78;">$99.00</div>
+        <div class="cross-line" id="s26-bill-cross" style="width:100%;left:0;top:50%;"></div>
+      </div>
+
+      <!-- S27: 黑盒 -->
+      <div class="s27-box" id="s27-box">📦</div>
+      <div class="s27-q" id="s27-q1">?</div>
+      <div class="s27-q" id="s27-q2">?</div>
+      <div class="s27-q" id="s27-q3">?</div>
+
+      <!-- S29: 8 节点 B2B 呼叫中心 -->
+      <div class="s29-grid" id="s29-grid">
+        <div class="s29-card" id="s29-c1">
+          <div class="s29-card-inner">📝 Form Lead</div>
+          <span style="color:#888;">Web submission...</span>
+        </div>
+        <div class="s29-card" id="s29-c2">
+          <div class="s29-card-inner">⏱️ 10s Timer</div>
+          <span style="color:#ff2d78;font-weight:900;" id="s29-timer">10.0s</span>
+        </div>
+        <div class="s29-card" id="s29-c3">
+          <div class="s29-card-inner">⚡ VPS Agent</div>
+          <span style="color:#00fff0;">Hermes trigger</span>
+        </div>
+        <div class="s29-card" id="s29-c4">
+          <div class="s29-card-inner">📞 Twilio Dial</div>
+          <span style="color:#00b3ff;">Calling client...</span>
+        </div>
+        <div class="s29-card" id="s29-c5">
+          <div class="s29-card-inner">🎙️ ElevenLabs</div>
+          <span style="color:#39ff14;">Low latency voice</span>
+        </div>
+        <div class="s29-card" id="s29-c6">
+          <div class="s29-card-inner">🗣️ AI Dialog</div>
+          <span style="color:#ddfff8;">Gathering painpoints</span>
+        </div>
+        <div class="s29-card" id="s29-c7">
+          <div class="s29-card-inner">📅 Cal.com</div>
+          <span style="color:#ffd700;">Auto scheduled</span>
+        </div>
+        <div class="s29-card" id="s29-c8">
+          <div class="s29-card-inner">📂 Sheets Sync</div>
+          <span style="color:#39ff14;">Obsidian logged</span>
+        </div>
+      </div>
+
+      <!-- S30: AUTO 印章 -->
+      <div class="s30-stamp" id="s30-stamp">AUTO APPROVED</div>
+
+      <!-- S31: 天平 -->
+      <div class="s31-scale" id="s31-scale">
+        <div class="s31-stand"></div>
+        <div class="s31-beam" id="s31-beam">
+          <div class="s31-plate" style="left:-50px;top:0;">
+            <div class="brut-card glow-magenta" style="width:140px;bottom:15px;left:-20px;opacity:1;transform:scale(1);font-size:11px;">
+              💰 Cost<br><span style="font-size:14px;color:#ff2d78;">$10,000</span>
+            </div>
+          </div>
+          <div class="s31-plate" style="right:-50px;top:0;">
+            <div class="brut-card glow-green" style="width:140px;bottom:15px;left:-20px;opacity:1;transform:scale(1);font-size:11px;">
+              💎 Saved Leads<br><span style="font-size:14px;color:#39ff14;" id="s31-leads-val">$0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- S32: 传送带 -->
+      <div class="s32-belt" id="s32-belt">
+        <div class="s32-belt-bg" id="s32-belt-bg"></div>
+        <div class="s32-item" id="s32-i1">📹</div>
+        <div class="s32-item" id="s32-i2">📝</div>
+        <div class="s32-item" id="s32-i3">🎨</div>
+        <div class="s32-item" id="s32-i4">🎞️</div>
+      </div>
+
+      <!-- S33: PARA 象限 -->
+      <div class="s33-para" id="s33-para">
+        <div class="s33-quad" style="border-color:#ff2d78;">📂 Projects (项目)</div>
+        <div class="s33-quad" style="border-color:#00fff0;">🌐 Areas (领域)</div>
+        <div class="s33-quad" style="border-color:#39ff14;">🔬 Resources (资源)</div>
+        <div class="s33-quad" style="border-color:#00b3ff;">📦 Archives (归档)</div>
+      </div>
+
+      <!-- S34: 昼夜分屏 -->
+      <div class="s34-split" id="s34-split">
+        <div class="s10-half" style="background:rgba(8,11,20,0.95);border-color:#ff2d78;">
+          <span style="font-size:48px;">🌙</span>
+          <div style="font-size:14px;font-weight:bold;color:#ff2d78;margin-top:10px;">Sleep State // AI Translation</div>
+          <p style="font-size:10px;color:#888;margin-top:4px;">Hermes is scraping YouTube in the background...</p>
+        </div>
+        <div class="s10-half" style="background:rgba(255,255,255,0.02);border-color:#39ff14;">
+          <span style="font-size:48px;">☀️</span>
+          <div style="font-size:14px;font-weight:bold;color:#39ff14;margin-top:10px;">Wake Up State // Report Received</div>
+          <div class="brut-card glow-green" id="s34-report" style="width:180px;bottom:30px;opacity:0;left:50%;transform:translateX(-50%);font-size:10px;padding:8px;">
+            📝 今日爆款二创口播脚本.md
+          </div>
+        </div>
+      </div>
+
+      <!-- S35: Terminal code healing -->
+      <div class="s35-diff" id="s35-diff">
+        <span style="color:#00fff0;"># playwright-mcp-agent --test --run</span><br>
+        <span style="color:#888;">[1/3] Reading user story specifications... DONE.</span><br>
+        <span style="color:#888;">[2/3] Executing Playwright E2E browser tests...</span><br>
+        <span style="color:#ff2d78;font-weight:900;" id="s35-fail-msg">> [ERROR] FAIL: test_auth_persistence failed</span><br>
+        <div id="s35-healing-diff" style="display:none;margin-top:8px;">
+          <span style="color:#ff3350;">- const cookie = getSessionCookie();</span><br>
+          <span style="color:#39ff14;">+ const cookie = await getSessionCookieSecurely(this.context);</span><br>
+          <span style="color:#ffd700;">> Auto healing applied. Re-running tests... PASS. Committing to GitHub...</span>
+        </div>
+      </div>
+
+      <!-- S37: 拿回时间控制权 -->
+      <div id="s37-hand" class="s22-eye">✊</div>
+      <div id="s37-watch" class="s22-eye" style="font-size:48px;text-shadow:0 0 15px #00fff0;margin-top:15px;">⏳</div>
+
+      <!-- S40: 句卡 -->
+      <div class="s40-quote" id="s40-quote">
+        <div style="width:45%;text-align:right;font-size:16px;color:#888;">大多数 AI 工具<br>你在学它</div>
+        <div class="s40-line" id="s40-line"></div>
+        <div style="width:45%;text-align:left;font-size:22px;font-weight:900;color:#00fff0;text-shadow:0 0 12px #00fff0;">但 Hermes<br>是它在学你</div>
+      </div>
+
+      <!-- S41: 韭菜 vs 玩家 -->
+      <div class="s41-split" id="s41-split">
+        <div class="s10-half" style="border-color:#888;">
+          <span style="font-size:64px;">🌾</span>
+          <span style="font-size:14px;color:#ff2d78;margin-top:10px;font-weight:bold;">Traffic Leek (韭菜)</span>
+        </div>
+        <div class="s10-half" style="border-color:#00fff0;">
+          <span style="font-size:64px;">🎮</span>
+          <span style="font-size:14px;color:#00fff0;margin-top:10px;font-weight:bold;">System Player (玩家)</span>
+        </div>
+      </div>
+
+      <!-- S42/43: 蓝图 -->
+      <div id="s42-blueprint" class="s42-blueprint-class">
+        <svg viewBox="0 0 580 280" style="width:100%;height:100%;stroke:#00fff0;stroke-width:1;fill:none;">
+          <rect x="20" y="20" width="140" height="80" rx="6" />
+          <rect x="20" y="160" width="140" height="80" rx="6" />
+          <rect x="420" y="90" width="140" height="100" rx="6" />
+          <path d="M 160,60 L 290,60 L 290,140 L 420,140" />
+          <path d="M 160,200 L 290,200 L 290,140" />
+        </svg>
+        <div style="position:absolute;font-size:18px;font-weight:900;color:#00fff0;" id="s42-blueprint-text">FACTORY BLUEPRINT</div>
+      </div>
+
+      <!-- S44: CTA BUTTON -->
+      <button class="s44-btn" id="s44-btn">立即开启超级个体之路</button>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const scenes = [
+  // 第一幕
+  { id: 1, dur: 5.0, text: "“你有没有发现，你每天都在做着重复、低效且消耗精力的机械劳动？”" },
+  { id: 2, dur: 6.0, text: "“早上醒来，你需要花一两个小时刷科技新闻、整理待办事项、盯着竞品的更新，甚至还在手动复制粘贴、处理格式？”" },
+  { id: 3, dur: 4.5, text: "“在这个 AI 满地跑的 2026 年，你是否想过，这些事情本来就不该由你来做？”" },
+  { id: 4, dur: 4.0, text: "“我们已经进入了一个全新的超级个体时代。”" },
+  { id: 5, dur: 6.5, text: "“在海外，很多敏锐的科技创业者正在通过帮企业搭建‘Speed-to-Lead’自动代理系统，轻松拿到一万美金以上的合同。”" },
+  { id: 6, dur: 6.0, text: "“他们不需要庞大的研发团队，不需要写几万行复杂的底层代码，甚至只需要一台 VPS，一个下午的时间。”" },
+  // 第二幕
+  { id: 7, dur: 6.0, text: "“为什么你用着各种昂贵的 AI 工具，却依然每天忙得像个陀螺，时薪连 20 块都不到？”" },
+  { id: 8, dur: 5.0, text: "“因为你用的大多数工具，只是一个聪明的搜索框。”" },
+  { id: 9, dur: 5.5, text: "“你问它，它答你，然后它就把你忘了。”" },
+  { id: 10, dur: 5.0, text: "“我们在进化，而传统的工具却在原地踏步。”" },
+  { id: 11, dur: 6.0, text: "“今天，我们要聊的，是彻底改变我们对 AI 认知的东西——Hermes Agent 与 Claude Code 的终极组合。”" },
+  { id: 12, dur: 6.5, text: "“它不是一个被动回答问题的聊天框，而是一个能在后台 24 小时为你干活的、完全自主进化的数字分身。”" },
+  // 第三幕
+  { id: 13, dur: 8.0, text: "“我们用 Hermes 构建的自动化工厂，核心有三根支柱是其他工具所没有的：持久记忆、自我进化的技能库，以及定时自动执行的任务机器人。”" },
+  { id: 14, dur: 4.5, text: "“首先是记忆系统。”" },
+  { id: 15, dur: 5.5, text: "“你是否讨厌每次开启新对话时，都要把自己的偏好、背景信息重新对齐一遍？”" },
+  { id: 16, dur: 3.5, text: "“Hermes不会这样。”" },
+  { id: 17, dur: 5.0, text: "“It will persist our working style, preferences, and configs in memory.”" },
+  { id: 18, dur: 4.5, text: "“下次对话，直接读取，无缝衔接。”" },
+  { id: 19, dur: 4.0, text: "“其次是技能进化。”" },
+  { id: 20, dur: 6.0, text: "“当我们反复要求它执行某一类任务时，后台的 Curator 机制就会静默运行，自动把这个复杂的流程固化成一个专属的‘技能’。”" },
+  { id: 21, dur: 5.0, text: "“下一次，你只需要一键调用，它就能自动跑完之前所有的步骤。”" },
+  { id: 22, dur: 5.0, text: "“它在默默观察我们的行为，随着你用得越多，它就越懂你。”" },
+  { id: 23, dur: 4.5, text: "“不是我们去学它，而是它在主动适应我们。”" },
+  { id: 24, dur: 4.0, text: "“最后是定时任务。”" },
+  { id: 25, dur: 8.0, text: "“我们可以轻松在配置中设置：每天早上七点，它自动利用爬虫 Agent 从 YouTube 或海外科技媒体抓取最新的热门视频，提取口播稿，通过大模型进行多维分析，提炼出流量密码，处理完后直接推送到你的 Telegram。”" },
+  { id: 26, dur: 6.5, text: "“在这个过程中，你甚至不需要支付任何云端 API 费用，完全可以使用本地的 Ollama 加上开源模型在你的机器上跑。”" },
+  // 第四幕
+  { id: 27, dur: 4.5, text: "“我们可以把这套架构应用在哪些商业场景？”" },
+  { id: 28, dur: 5.0, text: "“来看看海外现在最火的 B2B 自动化服务：Speed-to-Lead 语音客服代理。”" },
+  { id: 29, dur: 12.0, text: "“当一个新客户在你的网页或广告表单里留下联系方式，在短短 10 秒钟之内，部署在 Hostinger VPS 上的 Hermes Agent 就会通过 Twilio 拨通对方的电话，配合 ElevenLabs 的超低延迟语音合成技术，和客户进行自然流畅的对话，询问对方的痛点和需求，最后通过 Cal.com API 自动在日历上订好服务时间，最后将整理好的 leads 信息自动同步 to Google Sheets 或者你的 Obsidian 看板上。”" },
+  { id: 30, dur: 4.5, text: "“一整套流程，全自动运行，没有人工干扰。”" },
+  { id: 31, dur: 5.5, text: "“这就是为什么企业愿意为它支付上万元，因为这能帮他们守住原本流失掉的数十万销售线索。”" },
+  { id: 32, dur: 4.5, text: "“我们还可以将它用于内容生产流水线。”" },
+  { id: 33, dur: 5.0, text: "“我们将它接入 Obsidian，让它充当你的 PARA 知识整理官。”" },
+  { id: 34, dur: 6.5, text: "“你睡觉，它在云端拉取对标视频并转译；你起床，它直接向你汇报今日份的二创口播脚本，并自动归档分类。”" },
+  { id: 35, dur: 8.0, text: "“你甚至还可以将它应用在代码测试与自动修复上，配合 Playwright MCP 和 Claude Code，自动读取用户故事、生成测试计划、在后台默默跑通测试，遇到报错时自动修复并提交到 GitHub 仓库。”" },
+  // 第五幕
+  { id: 36, dur: 5.0, text: "“这才是我们理解的 2026 年的 AI 工作流。”" },
+  { id: 37, dur: 5.5, text: "“它不是锦上添花，而是真正替我们拿回时间控制权的降维打击。”" },
+  { id: 38, dur: 5.0, text: "“在过去，你想搭建这样一套跨平台、跨工具的系统，需要懂复杂的网络协议、服务器运维和各种 API 对接。”" },
+  { id: 39, dur: 6.5, text: "“但在今天，有了像 Hermes Agent 这样开源的、能部署在本地或 VPS 上的多智能体团队，零代码基础的你，也可以构建出属于自己的‘自动化工厂’。”" },
+  { id: 40, dur: 6.0, text: "“有一句话，我们觉得说得很准：‘大多数 AI 工具，你在学它；但 Hermes，是它在学你。’”" },
+  { id: 41, dur: 6.0, text: "“在这个时代，是选择做被收割的流量韭菜，还是做掌握 Agent 降维打击的玩家？”" },
+  { id: 42, dur: 5.0, text: "“这取决于你现在是否选择开始构建自己的数字工厂。”" },
+  { id: 43, dur: 5.5, text: "“项目的开源地址和我们的配置指南已经放在了下方。”" },
+  { id: 44, dur: 6.0, text: "“关注我，回复‘一人公司’，和我们一起开启超级个体之路。我们下次视频见。”" }
+];
+
+let mainTl = null;
+let cvs, ctx;
+let activeScene = 1;
+const particles = [];
+let matrixDrops = [];
+
+// 初始化 Canvas 背景
+function initCanvas() {
+  cvs = document.getElementById('main-canvas');
+  ctx = cvs.getContext('2d');
+  cvs.width = window.innerWidth;
+  cvs.height = window.innerHeight;
+
+  // 星空粒子
+  for(let i=0; i<50; i++) {
+    particles.push({
+      x: Math.random() * cvs.width,
+      y: Math.random() * cvs.height,
+      r: Math.random() * 2 + 1,
+      vx: Math.random() * 0.4 - 0.2,
+      vy: Math.random() * 0.4 - 0.2
+    });
+  }
+
+  // 初始化 Matrix 字符雨
+  const cols = Math.floor(cvs.width / 20);
+  matrixDrops = Array(cols).fill(1);
+
+  function loop() {
+    ctx.clearRect(0,0, cvs.width, cvs.height);
+
+    // 默认星空背景连线
+    if (activeScene <= 6 || (activeScene >= 13 && activeScene <= 26) || activeScene >= 36) {
+      ctx.fillStyle = 'rgba(0, 255, 240, 0.15)';
+      ctx.strokeStyle = 'rgba(0, 255, 240, 0.05)';
+      particles.forEach((p, idx) => {
+        p.x += p.vx;
+        p.y += p.vy;
+        if(p.x < 0 || p.x > cvs.width) p.vx *= -1;
+        if(p.y < 0 || p.y > cvs.height) p.vy *= -1;
+        
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+        ctx.fill();
+
+        for(let j=idx+1; j<particles.length; j++) {
+          const p2 = particles[j];
+          const dist = Math.hypot(p.x - p2.x, p.y - p2.y);
+          if (dist < 100) {
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.stroke();
+          }
+        }
+      });
+    }
+
+    // 第二幕 & 第四幕：Matrix 字符雨
+    if ((activeScene >= 7 && activeScene <= 12) || (activeScene >= 27 && activeScene <= 35)) {
+      ctx.fillStyle = 'rgba(0, 255, 240, 0.6)';
+      ctx.font = '10px monospace';
+      matrixDrops.forEach((y, i) => {
+        const char = String.fromCharCode(33 + Math.random() * 93);
+        ctx.fillText(char, i * 20, y * 12);
+        if (y * 12 > cvs.height && Math.random() > 0.975) {
+          matrixDrops[i] = 0;
+        }
+        matrixDrops[i]++;
+      });
+    }
+
+    requestAnimationFrame(loop);
+  }
+  loop();
+}
+
+// 屏幕缩放自适应 (基于 900x640 设计空间进行等比缩放，解耦 GSAP 变焦)
+function handleResize() {
+  const scaler = document.getElementById('stage-scaler');
+  if (!scaler) return;
+  const baseW = 900;
+  const baseH = 640;
+  const realW = window.innerWidth;
+  const realH = window.innerHeight;
+  
+  const isMobile = realW < 768;
+  
+  if (isMobile) {
+    // ⚡ 手机端自适应：让 stage-scaler 占满物理窗口，直接应用 CSS Media Queries 做高保真布局，防缩成一坨
+    gsap.set(scaler, {
+      scale: 1,
+      width: realW,
+      height: realH,
+      x: 0,
+      y: 0
+    });
+  } else {
+    // 桌面端自适应：等比缩放
+    const scale = Math.min(realW / baseW, realH / baseH);
+    gsap.set(scaler, {
+      scale: scale,
+      width: baseW,
+      height: baseH,
+      transformOrigin: 'center center',
+      x: 0,
+      y: 0
+    });
+  }
+  
+  // 重置 Canvas 大小
+  if (cvs) {
+    cvs.width = realW;
+    cvs.height = realH;
+  }
+}
+
+// 渲染 DNA 螺旋
+function drawHelix() {
+  const container = document.getElementById('s19-helix');
+  container.innerHTML = '';
+  for(let i=0; i<8; i++) {
+    const dot1 = document.createElement('div');
+    const dot2 = document.createElement('div');
+    const styles = `width:6px;height:6px;border-radius:50%;position:absolute;left:27px;`;
+    dot1.style = styles + `background:#ff2d78;`;
+    dot2.style = styles + `background:#00fff0;`;
+    container.appendChild(dot1);
+    container.appendChild(dot2);
+    
+    gsap.to(dot1, {
+      x: () => Math.sin(i * 0.8) * 20,
+      y: i * 8,
+      duration: 1.5,
+      repeat: -1,
+      yoyo: true,
+      ease: 'sine.inOut'
+    });
+    gsap.to(dot2, {
+      x: () => -Math.sin(i * 0.8) * 20,
+      y: i * 8,
+      duration: 1.5,
+      repeat: -1,
+      yoyo: true,
+      ease: 'sine.inOut'
+    });
+  }
+}
+
+// 主时间轴构建
+function buildDirectorTimeline() {
+  const hud = document.getElementById('hud');
+  const hudContent = document.getElementById('hud-content');
+  const hudToggle = document.getElementById('hud-toggle');
+  let isHudVisible = true;
+  
+  hud.querySelector('#hud-label').addEventListener('click', () => {
+    isHudVisible = !isHudVisible;
+    hudContent.style.display = isHudVisible ? 'block' : 'none';
+    hudToggle.innerText = isHudVisible ? '▲' : '▼';
+  });
+
+  mainTl = gsap.timeline();
+  scenes.forEach((sc, i) => {
+    mainTl.call(() => {
+      activeScene = sc.id;
+      document.getElementById('scene-num').innerText = sc.id;
+      document.getElementById('hud-text').innerText = sc.text;
+      playSceneAnimation(sc.id, sc.dur);
+    }, null, i === 0 ? 0 : "+=" + scenes[i-1].dur);
+  });
+}
+
+// 精准控制 44 个分镜
+function playSceneAnimation(num, dur) {
+  // 清理所有正在运行的动画
+  gsap.killTweensOf('*');
+  
+  const allElements = [
+    '#s1-sil', '#s1-orbit', '#s2-card1', '#s2-card2', '#s2-card3', '#s2-card4',
+    '#s4-title', '#s4-line', '#s5-map', '#s6-team', '#s6-vps', '#s7-top', '#s7-salary',
+    '#s8-search', '#s9-bubble', '#s10-split', '#s11-logo', '#s12-twin', '#s12-clock',
+    '#s13-p1', '#s13-p2', '#s13-p3', '#s15-b1', '#s15-b2', '#s15-reset', '#s16-cross',
+    '#s16-badge', '#s17-c1', '#s17-c2', '#s17-c3', '#s17-db', '#s18-chat', '#s20-t1',
+    '#s20-t2', '#s20-t3', '#s20-badge', '#s21-pipe', '#s22-eye', '#s23-split', '#s25-flow',
+    '#s26-server', '#s26-bill', '#s27-box', '#s27-q1', '#s27-q2', '#s27-q3', '#s29-grid',
+    '#s30-stamp', '#s31-scale', '#s32-belt', '#s33-para', '#s34-split', '#s35-diff',
+    '#s37-hand', '#s37-watch', '#s40-quote', '#s41-split', '#s42-blueprint', '#s44-btn',
+    '#global-pipes'
+  ];
+  
+  // ⚡ 核心修复 8: clearProps 只重置 transforms, opacity 等非布局样式，彻底保留 CSS Layout 解决重合叠在正中心与缩成一坨的缺陷！
+  gsap.set(allElements, { clearProps: "transform,opacity,display,scale,x,y,rotation,filter,borderColor,boxShadow" });
+  
+  // 隐藏所有元素
+  gsap.set(allElements, { display: 'none', opacity: 0 });
+  
+  // 重置 SVG 激活管道 (防红线残留)
+  gsap.set('#pipe-active', { strokeDashoffset: 530 });
+  
+  // 重置主舞台位置与变焦
+  gsap.set('#visual-board', { scale: 1, x: 0, y: 0, rotation: 0 });
+
+  const isMobile = window.innerWidth < 768;
+
+  // 场景映射动画
+  if (num === 1) {
+    gsap.set(['#s1-sil', '#s1-orbit'], { display: 'flex', opacity: 1 });
+    gsap.fromTo('#s1-sil', { scale: 0.2, opacity: 0 }, { scale: 1, opacity: 1, duration: 1, ease: 'back.out(1.7)' });
+    gsap.fromTo('#s1-orbit', { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, duration: 1.2, ease: 'power2.out', delay: 0.3 });
+    gsap.to('#s1-orbit', { rotation: 360, duration: 10, repeat: -1, ease: 'none' });
+    gsap.to('.s1-orbit-node', { rotation: -360, duration: 10, repeat: -1, ease: 'none' });
+    const nodes = document.querySelectorAll('.s1-orbit-node');
+    nodes.forEach((nd, idx) => {
+      const angle = (idx / nodes.length) * Math.PI * 2;
+      nd.style.left = `${160 + Math.sin(angle) * 130 - 21}px`;
+      nd.style.top = `${160 + Math.cos(angle) * 130 - 21}px`;
+    });
+  } 
+  else if (num === 2) {
+    gsap.set(['#s2-card1', '#s2-card2', '#s2-card3', '#s2-card4'], { display: 'block', opacity: 0 });
+    gsap.fromTo(['#s2-card1', '#s2-card2', '#s2-card3', '#s2-card4'], 
+      { scale: 0.5, opacity: 0 }, 
+      { scale: 1, opacity: 1, duration: 0.8, stagger: 0.15, ease: 'back.out(1.5)' }
+    );
+  } 
+  else if (num === 3) {
+    gsap.set(['#s2-card1', '#s2-card2', '#s2-card3', '#s2-card4'], { display: 'block', opacity: 1 });
+    gsap.to(['#s2-card1', '#s2-card2', '#s2-card3', '#s2-card4'], {
+      borderColor: '#ff2d78', boxShadow: '0 0 15px #ff2d78', repeat: 3, yoyo: true, duration: 0.25
+    });
+    gsap.to('#visual-board', { x: '+=10', y: '-=8', duration: 0.05, repeat: 10, yoyo: true });
+    gsap.to(['#s2-card1', '#s2-card2', '#s2-card3', '#s2-card4'], { opacity: 0, duration: 0.5, delay: dur - 0.7 });
+  } 
+  else if (num === 4) {
+    gsap.set(['#s4-title', '#s4-line'], { display: 'block', opacity: 1 });
+    gsap.fromTo('#s4-title', { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1, duration: 1.2, ease: 'power3.out' });
+    gsap.fromTo('#s4-line', { scaleX: 0 }, { scaleX: 1, duration: 0.8, delay: 0.4, transformOrigin: 'center' });
+  } 
+  else if (num === 5) {
+    gsap.set('#s5-map', { display: 'block', opacity: 1 });
+    gsap.fromTo('#s5-map', { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 1 });
+    gsap.to('.map-point', { opacity: 1, scale: 1.5, stagger: 0.1, duration: 0.5, yoyo: true, repeat: -1 });
+    gsap.fromTo('#s5-contract', { scale: 0.4, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.8, delay: 0.6, ease: 'back.out(1.5)' });
+    const counterObj = { val: 0 };
+    gsap.to(counterObj, {
+      val: 10000, duration: 1.5, delay: 1, snap: { val: 1 },
+      onUpdate: () => {
+        document.getElementById('s5-value').innerText = `$${counterObj.val.toLocaleString()}`;
+      }
+    });
+  } 
+  else if (num === 6) {
+    gsap.set('#s6-team', { display: 'flex', opacity: 1 });
+    gsap.fromTo('#s6-team', { opacity: 0, y: -40 }, { opacity: 1, y: 0, duration: 0.8 });
+    gsap.to(['#s6-cross1', '#s6-cross2'], { width: '105%', duration: 0.5, stagger: 0.3, delay: 0.8, ease: 'power2.out' });
+    gsap.set('#s6-vps', { display: 'flex', opacity: 1 });
+    gsap.fromTo('#s6-vps', { scale: 0.3, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.8, delay: 1.6, ease: 'back.out(1.6)' });
+  } 
+  else if (num === 7) {
+    gsap.set(['#s7-top', '#s7-salary'], { display: 'flex', opacity: 1 });
+    gsap.fromTo('#s7-top', { scale: 0.3, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.8, ease: 'back.out(1.4)' });
+    gsap.to('#s7-top', { rotation: '+=720', duration: dur, ease: 'none' });
+    const logos = document.querySelectorAll('.s7-logo');
+    logos.forEach((lg, idx) => {
+      const angle = (idx / logos.length) * Math.PI * 2;
+      lg.style.left = `${60 + Math.sin(angle) * 75 - 18}px`;
+      lg.style.top = `${60 + Math.cos(angle) * 75 - 18}px`;
+      gsap.to(lg, { x: '+=6', y: '-=6', yoyo: true, repeat: -1, duration: 0.2 + idx * 0.1 });
+    });
+    gsap.fromTo('#s7-salary', { opacity: 0 }, { opacity: 1, duration: 0.4, delay: 0.8 });
+    gsap.to('#s7-salary', { color: '#ff2d78', textShadow: '0 0 20px #ff2d78', repeat: -1, yoyo: true, duration: 0.15, delay: 1.2 });
+  } 
+  else if (num === 8) {
+    gsap.set('#s8-search', { display: 'flex', opacity: 1 });
+    gsap.fromTo('#s8-search', { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.8 });
+    const txt = "What is artificial intelligence?";
+    const txtEl = document.getElementById('s8-search-text');
+    txtEl.innerText = "";
+    gsap.to({}, {
+      duration: 2, delay: 0.8,
+      onUpdate: function() {
+        const progress = Math.floor(this.progress() * txt.length);
+        txtEl.innerText = txt.substring(0, progress);
+      }
+    });
+  } 
+  else if (num === 9) {
+    gsap.set('#s9-bubble', { display: 'block', opacity: 1 });
+    gsap.fromTo('#s9-bubble', { scale: 0.3, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: 'back.out(1.5)' });
+    const pEl = document.getElementById('s9-bubble-text');
+    pEl.innerText = "";
+    gsap.to({}, {
+      duration: 1.2,
+      onUpdate: function() {
+        pEl.innerText = "Here is the key insights about your query...".substring(0, Math.floor(this.progress() * 45));
+      }
+    });
+    gsap.to('#s9-bubble', { opacity: 0, scale: 1.1, filter: 'blur(10px)', duration: 0.8, delay: dur - 1.2, ease: 'power2.in' });
+  } 
+  else if (num === 10) {
+    gsap.set('#s10-split', { display: 'flex', opacity: 1 });
+    gsap.fromTo('#s10-split', { opacity: 0, scale: 0.95 }, { opacity: 1, scale: 1, duration: 0.8 });
+    gsap.to('#s10-old-icon', { x: '+=8', yoyo: true, repeat: -1, duration: 0.2 });
+    gsap.to('#s10-new-icon', { rotation: 360, duration: 4, repeat: -1, ease: 'none' });
+    gsap.to('#s10-new-icon', { scale: 1.2, yoyo: true, repeat: -1, duration: 0.8, ease: 'power1.inOut' });
+  } 
+  else if (num === 11) {
+    gsap.set('#s11-logo', { display: 'block', opacity: 1 });
+    gsap.fromTo('#s11-logo', { scale: 0.1, opacity: 0, rotation: -45 }, { scale: 1, opacity: 1, rotation: 0, duration: 0.8, ease: 'back.out(1.7)' });
+    gsap.fromTo('#flash-overlay', { opacity: 0.8 }, { opacity: 0, duration: 0.4, delay: 0.4 });
+  } 
+  else if (num === 12) {
+    gsap.set(['#s12-twin', '#s12-clock'], { display: 'flex', opacity: 1 });
+    gsap.fromTo('#s12-twin', { scale: 0.3, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.8, ease: 'back.out(1.6)' });
+    gsap.fromTo('#s12-clock', { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, duration: 1, delay: 0.3 });
+    gsap.to('#s12-clock', { rotation: 360, duration: 8, repeat: -1, ease: 'none' });
+  } 
+  else if (num === 13) {
+    gsap.set('#global-pipes', { display: 'block', opacity: 1 });
+    gsap.set(['#s13-p1', '#s13-p2', '#s13-p3'], { display: 'flex', opacity: 1 });
+    gsap.fromTo(['#s13-p1', '#s13-p2', '#s13-p3'], { y: 100, opacity: 0 }, { y: 0, opacity: 1, duration: 1, stagger: 0.2, ease: 'back.out(1.5)' });
+    drawHelix();
+    gsap.to('#s24-gear', { rotation: 360, duration: 6, repeat: -1, ease: 'none' });
+  } 
+  else if (num === 14) {
+    gsap.set('#s13-p1', { display: 'flex', opacity: 1 });
+    // ⚡ 核心修复 9: 手机端垂直排列下，x平移设为0，垂直y平移设为120px，保证完全居中，不漂移到画面外
+    const zoomX = isMobile ? 0 : 397;
+    const zoomY = isMobile ? 120 : -40;
+    gsap.to('#visual-board', { scale: 1.5, x: zoomX, y: zoomY, duration: 0.8, ease: 'power2.out' });
+    gsap.to('.s14-db-drawer', { opacity: 1, stagger: 0.2, duration: 0.4, delay: 0.8 });
+  } 
+  else if (num === 15) {
+    gsap.set(['#s15-b1', '#s15-b2', '#s15-reset'], { display: 'block', opacity: 1 });
+    gsap.fromTo('#s15-b1', { x: -50, opacity: 0 }, { x: 0, opacity: 1, duration: 0.6 });
+    gsap.fromTo('#s15-b2', { x: 50, opacity: 0 }, { x: 0, opacity: 1, duration: 0.6, delay: 0.8 });
+    gsap.fromTo('#s15-reset', { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.4, delay: 1.6, ease: 'back.out(1.4)' });
+    gsap.to('#s15-reset', { rotation: 360, duration: 2, repeat: -1, ease: 'none', delay: 2 });
+  } 
+  else if (num === 16) {
+    gsap.set(['#s16-cross', '#s16-badge'], { display: 'flex', opacity: 1 });
+    gsap.fromTo('#s16-cross', { scale: 0.2, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.4, ease: 'power2.out' });
+    gsap.to('#s16-cross', { opacity: 0, duration: 0.3, delay: 0.8 });
+    gsap.fromTo('#s16-badge', { scale: 0.1, opacity: 0, rotation: -90 }, { scale: 1, opacity: 1, rotation: 45, duration: 0.8, delay: 0.9, ease: 'back.out(1.5)' });
+  } 
+  else if (num === 17) {
+    gsap.set(['#s17-c1', '#s17-c2', '#s17-c3', '#s17-db'], { display: 'block', opacity: 1 });
+    
+    // ⚡ 核心修复 10: 存档卡片采用绝对 left/top 动态向数据库中心点收纳，消除不同分辨率下的相对位移溢出
+    const dbEl = document.getElementById('s17-db');
+    const dbLeft = dbEl.offsetLeft + 25; // 居中微调
+    const dbTop = dbEl.offsetTop + 20;
+
+    gsap.fromTo(['#s17-c1', '#s17-c2', '#s17-c3'], 
+      { opacity: 0, scale: 0.5 }, 
+      { opacity: 1, scale: 1, duration: 0.5, stagger: 0.15 }
+    );
+    gsap.to(['#s17-c1', '#s17-c2', '#s17-c3'], {
+      left: dbLeft,
+      top: dbTop,
+      scale: 0.1,
+      opacity: 0,
+      duration: 0.8,
+      stagger: 0.15,
+      delay: 0.8,
+      ease: 'power2.in',
+      onComplete: function() {
+        gsap.to('#s17-db', { scale: 1.1, repeat: 1, yoyo: true, duration: 0.1 });
+      }
+    });
+  } 
+  else if (num === 18) {
+    gsap.set('#s18-chat', { display: 'flex', opacity: 1 });
+    gsap.fromTo('#s18-chat', { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.8, ease: 'back.out(1.5)' });
+    const placeholder = document.getElementById('s18-input-placeholder');
+    gsap.to({}, {
+      duration: 1.2, delay: 0.8,
+      onStart: () => { placeholder.style.color = '#00fff0'; },
+      onUpdate: function() {
+        placeholder.innerText = "System loading Tone: Cyberpunk... OK".substring(0, Math.floor(this.progress() * 38));
+      }
+    });
+  } 
+  else if (num === 19) {
+    gsap.set('#s13-p2', { display: 'flex', opacity: 1 });
+    const zoomY = isMobile ? -60 : -40;
+    gsap.to('#visual-board', { scale: 1.5, x: 0, y: zoomY, duration: 0.8, ease: 'power2.out' });
+    drawHelix();
+  } 
+  else if (num === 20) {
+    gsap.set(['#s20-t1', '#s20-t2', '#s20-t3', '#s20-badge'], { display: 'flex', opacity: 1 });
+    gsap.fromTo(['#s20-t1', '#s20-t2', '#s20-t3'], { opacity: 0, x: -40 }, { opacity: 1, x: 0, duration: 0.6, stagger: 0.15 });
+    
+    // ⚡ 核心修复 11: 动态读取 s20-badge 的实时坐标进行绝对飞入，100% 适配手机端与电脑端不同分辨率，完美解决重合叠在一起与尺寸过小的问题
+    const badgeEl = document.getElementById('s20-badge');
+    const targetLeft = badgeEl.offsetLeft + 20;
+    const targetTop = badgeEl.offsetTop + 20;
+
+    gsap.to('#s20-t1', { left: targetLeft, top: targetTop, scale: 0.1, opacity: 0, duration: 0.8, delay: 1.6, ease: 'power2.in' });
+    gsap.to('#s20-t2', { left: targetLeft, top: targetTop, scale: 0.1, opacity: 0, duration: 0.8, delay: 1.7, ease: 'power2.in' });
+    gsap.to('#s20-t3', { left: targetLeft, top: targetTop, scale: 0.1, opacity: 0, duration: 0.8, delay: 1.8, ease: 'power2.in' });
+    
+    gsap.fromTo('#s20-badge', { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, delay: 2.3, ease: 'back.out(1.6)' });
+  } 
+  else if (num === 21) {
+    gsap.set('#global-pipes', { display: 'block', opacity: 1 });
+    gsap.set('#s21-pipe', { display: 'flex', opacity: 1 });
+    gsap.to('.s21-node', { scale: 1, duration: 0.6, stagger: 0.15, ease: 'back.out(1.6)' });
+    gsap.set('#pipe-active', { strokeDashoffset: 530 });
+    gsap.to('#pipe-active', { strokeDashoffset: 0, duration: 1.5, delay: 0.8 });
+  } 
+  else if (num === 22) {
+    gsap.set('#s22-eye', { display: 'block', opacity: 1 });
+    gsap.fromTo('#s22-eye', { scaleY: 0.1, opacity: 0 }, { scaleY: 1, opacity: 1, duration: 0.8, ease: 'elastic.out(1, 0.4)' });
+    gsap.to('#s22-eye', { scale: 1.1, repeat: -1, yoyo: true, duration: 0.8 });
+  } 
+  else if (num === 23) {
+    gsap.set('#s23-split', { display: 'flex', opacity: 1 });
+    gsap.fromTo('#s23-split', { opacity: 0 }, { opacity: 1, duration: 0.6 });
+    gsap.fromTo('#s23-cross', { width: '0%' }, { width: '100%', duration: 0.4, delay: 0.6 });
+    gsap.fromTo('#s23-check', { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, delay: 1.2, ease: 'back.out(1.5)' });
+  } 
+  else if (num === 24) {
+    gsap.set('#s13-p3', { display: 'flex', opacity: 1 });
+    const zoomX = isMobile ? 0 : -397;
+    const zoomY = isMobile ? -240 : -40;
+    gsap.to('#visual-board', { scale: 1.5, x: zoomX, y: zoomY, duration: 0.8, ease: 'power2.out' });
+    gsap.to('#s24-gear', { rotation: '+=720', duration: dur, ease: 'none' });
+  } 
+  else if (num === 25) {
+    gsap.set('#s25-flow', { display: 'flex', opacity: 1 });
+    gsap.fromTo('#s25-flow', { opacity: 0 }, { opacity: 1, duration: 0.6 });
+    gsap.to('.s25-node', { scale: 1, duration: 0.5, stagger: 0.15, ease: 'back.out(1.5)' });
+    gsap.fromTo('#s25-noti', { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, delay: 1.8, ease: 'back.out(1.6)' });
+  } 
+  else if (num === 26) {
+    gsap.set(['#s26-server', '#s26-bill'], { display: 'flex', opacity: 1 });
+    gsap.fromTo('#s26-server', { x: -100, opacity: 0 }, { x: 0, opacity: 1, duration: 0.8, ease: 'back.out(1.4)' });
+    gsap.fromTo('#s26-bill', { x: 100, opacity: 0 }, { x: 0, opacity: 1, duration: 0.8, delay: 0.3, ease: 'back.out(1.4)' });
+    gsap.fromTo('#s26-bill-cross', { width: '0%' }, { width: '100%', duration: 0.4, delay: 1.2 });
+  } 
+  else if (num === 27) {
+    gsap.set(['#s27-box', '#s27-q1', '#s27-q2', '#s27-q3'], { display: 'flex', opacity: 1 });
+    gsap.fromTo('#s27-box', { scale: 0.1, rotation: -180, opacity: 0 }, { scale: 1, rotation: 45, opacity: 1, duration: 0.8, ease: 'back.out(1.5)' });
+    gsap.fromTo(['#s27-q1', '#s27-q2', '#s27-q3'], { opacity: 0, y: -20 }, { opacity: 1, y: 0, duration: 0.6, stagger: 0.2, delay: 0.6 });
+  } 
+  else if (num === 28) {
+    gsap.set('#s27-box', { display: 'flex', opacity: 1, scale: 1, rotation: 45 });
+    gsap.to('#s27-box', {
+      rotationY: 180, scale: 1.2, duration: 0.8, ease: 'power2.inOut',
+      onComplete: () => {
+        document.getElementById('s27-box').innerText = "📞";
+      }
+    });
+  } 
+  else if (num === 29) {
+    gsap.set('#s29-grid', { display: 'grid', opacity: 1 });
+    gsap.to('.s29-card', {
+      opacity: 1, scale: 1, duration: 0.6, stagger: 0.15, ease: 'back.out(1.4)'
+    });
+    const timeObj = { val: 10.0 };
+    gsap.to(timeObj, {
+      val: 0.0, duration: 5, snap: { val: 0.1 },
+      onUpdate: () => {
+        document.getElementById('s29-timer').innerText = `${timeObj.val.toFixed(1)}s`;
+      }
+    });
+  } 
+  else if (num === 30) {
+    gsap.set('#s29-grid', { display: 'grid', opacity: 0.2 });
+    gsap.set('#s30-stamp', { display: 'block', opacity: 1 });
+    gsap.fromTo('#s30-stamp', { scale: 4, opacity: 0, rotation: -45 }, { scale: 1, opacity: 1, rotation: -15, duration: 0.3, ease: 'power2.in' });
+    gsap.fromTo('#flash-overlay', { opacity: 0.6 }, { opacity: 0, duration: 0.2 });
+  } 
+  else if (num === 31) {
+    gsap.set('#s31-scale', { display: 'block', opacity: 1 });
+    gsap.fromTo('#s31-beam', { rotation: 0 }, { rotation: -12, duration: 1.2, ease: 'elastic.out(1, 0.4)' });
+    const leadsObj = { val: 0 };
+    gsap.to(leadsObj, {
+      val: 100000, duration: 2, delay: 0.5, snap: { val: 1000 },
+      onUpdate: () => {
+        document.getElementById('s31-leads-val').innerText = `$${leadsObj.val.toLocaleString()}`;
+      }
+    });
+  } 
+  else if (num === 32) {
+    gsap.set('#s32-belt', { display: 'flex', opacity: 1 });
+    gsap.to('#s32-belt-bg', { x: -100, duration: 3, repeat: -1, ease: 'none' });
+    const items = ['#s32-i1', '#s32-i2', '#s32-i3', '#s32-i4'];
+    items.forEach((it, idx) => {
+      gsap.set(it, { display: 'block', x: -50 + idx * 160 });
+      gsap.to(it, { x: '+=600', duration: 4, repeat: -1, ease: 'none' });
+    });
+  } 
+  else if (num === 33) {
+    gsap.set('#s33-para', { display: 'grid', opacity: 1 });
+    gsap.to('.s33-quad', {
+      opacity: 1, scale: 1, duration: 0.8, stagger: 0.15, ease: 'back.out(1.5)'
+    });
+  } 
+  else if (num === 34) {
+    gsap.set('#s34-split', { display: 'flex', opacity: 1 });
+    gsap.fromTo('#s34-split', { opacity: 0 }, { opacity: 1, duration: 0.8 });
+    gsap.fromTo('#s34-report', { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, delay: 1, ease: 'back.out(1.4)' });
+  } 
+  else if (num === 35) {
+    gsap.set('#s35-diff', { display: 'block', opacity: 1 });
+    gsap.to('#s35-fail-msg', { color: '#ff2d78', duration: 0.2, repeat: 5, yoyo: true });
+    gsap.set('#s35-healing-diff', { display: 'block', opacity: 1 });
+    gsap.fromTo('#s35-healing-diff', { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6, delay: 1.5 });
+  } 
+  else if (num === 36) {
+    gsap.set('#s4-title', { display: 'block', opacity: 1 });
+    document.getElementById('s4-title').innerText = "2026 AI 工作流";
+    gsap.fromTo('#s4-title', { scale: 0.2, opacity: 0 }, { scale: 1.5, opacity: 1, duration: 1.2, ease: 'power4.out' });
+  } 
+  else if (num === 37) {
+    gsap.set(['#s37-hand', '#s37-watch'], { display: 'block', opacity: 1 });
+    gsap.fromTo('#s37-hand', { scale: 0.1, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: 'back.out(1.5)' });
+    gsap.fromTo('#s37-watch', { scale: 0.1, opacity: 0, y: -20 }, { scale: 1, opacity: 1, y: 0, duration: 0.8, delay: 0.4, ease: 'elastic.out(1, 0.4)' });
+    gsap.to('#s37-watch', { textShadow: '0 0 30px #00fff0', scale: 1.1, repeat: 1, yoyo: true, duration: 0.2, delay: 1 });
+  } 
+  else if (num === 38) {
+    gsap.to('#visual-board', { x: '+=6', y: '+=6', duration: 0.05, repeat: -1, yoyo: true });
+  } 
+  else if (num === 39) {
+    gsap.set(['#s13-p1', '#s13-p2', '#s13-p3'], { display: 'flex', opacity: 1 });
+    gsap.fromTo(['#s13-p1', '#s13-p2', '#s13-p3'], { scale: 0.1, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.8, stagger: 0.15, ease: 'back.out(1.5)' });
+  } 
+  else if (num === 40) {
+    gsap.set(['#s40-quote', '#s40-line'], { display: 'flex', opacity: 1 });
+    gsap.fromTo('#s40-quote', { scale: 0.9, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.8 });
+    gsap.fromTo('#s40-line', { scaleY: 0 }, { scaleY: 1, duration: 0.8, ease: 'power2.out' });
+  } 
+  else if (num === 41) {
+    gsap.set('#s41-split', { display: 'flex', opacity: 1 });
+    gsap.fromTo('#s41-split', { opacity: 0 }, { opacity: 1, duration: 0.8 });
+  } 
+  else if (num === 42 || num === 43) {
+    gsap.set('#s42-blueprint', { display: 'flex', opacity: 1 });
+    gsap.fromTo('#s42-blueprint', { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 0.8 });
+    if (num === 43) {
+      gsap.to('#s42-blueprint', { backgroundColor: 'rgba(0, 255, 240, 0.15)', duration: 0.8 });
+      gsap.to('#s42-blueprint-text', { color: '#fff', scale: 1.1, duration: 0.4 });
+    }
+  } 
+  else if (num === 44) {
+    gsap.set('#s44-btn', { display: 'block', opacity: 1 });
+    gsap.fromTo('#s44-btn', { scale: 0.3, opacity: 0 }, { scale: 1, opacity: 1, duration: 1, ease: 'elastic.out(1, 0.5)' });
+    gsap.to('#s44-btn', {
+      boxShadow: '12px 12px 0px #000, 0 0 25px rgba(0, 255, 240, 0.6)',
+      repeat: -1,
+      yoyo: true,
+      duration: 1
+    });
+  }
+}
+
+window.addEventListener('message', (e) => {
+  if (!e.data || !mainTl) return;
+  const { type, speed } = e.data;
+  if (type === 'togglePlay') mainTl.paused() ? mainTl.play() : mainTl.pause();
+  if (type === 'restart') mainTl.restart();
+  if (type === 'setSpeed') mainTl.timeScale(speed);
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  initCanvas();
+  buildDirectorTimeline();
+  handleResize();
+  window.addEventListener('resize', handleResize);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>一人公司自动化 — 赛博朋克B-Roll</title>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:#080b14;color:#00FFF0;font-family:'Courier New',Consolas,monospace;overflow:hidden;height:100vh;width:100vw;}
+  
+  /* 画布与网格背景 */
+  #main-canvas{position:fixed;inset:0;z-index:0;pointer-events:none;}
+  #grid-bg{position:fixed;inset:0;z-index:0;background-image:linear-gradient(rgba(0,255,240,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,240,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;}
+  
+  /* 核心舞台 */
+  #stage{position:fixed;inset:0;z-index:1;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+  .scene-container{position:relative;width:900px;height:640px;display:flex;align-items:center;justify-content:center;}
+  
+  /* HUD 面板 */
+  #hud{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:50;width:88vw;max-width:680px;background:rgba(8,11,20,0.92);border:1px solid rgba(0,255,240,0.35);border-radius:18px;padding:10px 18px;backdrop-filter:blur(14px);box-shadow:0 0 25px rgba(0,255,240,0.15);}
+  #hud-label{font-size:10px;color:rgba(0,255,240,0.5);letter-spacing:2px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;}
+  #hud-clip{height:calc(1.45em * 2);overflow:hidden;}
+  #hud-text{font-size:12px;line-height:1.45;color:#ddfff8;font-family:sans-serif;display:block;}
+
+  /* 发光与描边 */
+  .glow-cyan{box-shadow:0 0 15px rgba(0,255,240,0.4),0 0 30px rgba(0,255,240,0.15);border:1.5px solid #00FFF0;}
+  .glow-magenta{box-shadow:0 0 15px rgba(255,45,120,0.4),0 0 30px rgba(255,45,120,0.15);border:1.5px solid #ff2d78;}
+  .glow-gold{box-shadow:0 0 15px rgba(255,215,0,0.4),0 0 30px rgba(255,215,0,0.15);border:1.5px solid #ffd700;}
+
+  /* 物理节点与卡片 */
+  .hex-card{position:absolute;width:240px;background:rgba(8,11,20,0.9);border-radius:12px;padding:12px 16px;text-align:left;opacity:0;}
+  
+  /* 上方卡片 */
+  #top-card{top:40px;left:50%;transform:translateX(-50%);}
+  /* 下方卡片 */
+  #bottom-card{bottom:40px;left:50%;transform:translateX(-50%);}
+
+  /* 极客终端样式 */
+  .terminal-box{background:rgba(0,0,0,0.6);border:1px solid rgba(0,255,240,0.25);border-radius:6px;padding:8px;font-size:10px;line-height:1.4;color:#ddfff8;height:70px;overflow:hidden;}
+
+  /* 钻石与圈 */
+  .center-ring-wrap{position:relative;width:200px;height:200px;display:flex;align-items:center;justify-content:center;}
+  .dashed-ring{position:absolute;width:170px;height:170px;border:2px dashed #00FFF0;border-radius:50%;opacity:0.3;}
+  .aci-diamond{position:relative;width:55px;height:55px;background:#ff2d78;border:2.5px solid #00FFF0;transform:rotate(45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 0 15px #ff2d78;}
+  .aci-diamond-text{transform:rotate(-45deg);color:#fff;font-weight:900;font-size:13px;}
+
+  /* 数据流动管道 */
+  .data-pipes{position:absolute;inset:0;pointer-events:none;}
+</style>
+</head>
+<body>
+<canvas id="main-canvas"></canvas>
+<div id="grid-bg"></div>
+
+<div id="hud">
+  <div id="hud-label">
+    <span>SCENE <span id="scene-num">1</span> // 一人公司自动化</span>
+    <span id="hud-toggle">▲</span>
+  </div>
+  <div id="hud-content">
+    <div id="hud-clip"><span id="hud-text"></span></div>
+  </div>
+</div>
+
+<div id="stage">
+  <div class="scene-container" id="visual-board">
+    
+    <!-- 拓扑连接线管道 -->
+    <svg class="data-pipes" viewBox="0 0 900 640">
+      <path id="pipe-top-left" d="M 450,150 L 330,220" fill="none" stroke="rgba(0,255,240,0.1)" stroke-width="2"/>
+      <path id="pipe-top-right" d="M 450,150 L 570,220" fill="none" stroke="rgba(0,255,240,0.1)" stroke-width="2"/>
+      
+      <!-- 主数据流连线 -->
+      <path id="flow-top-to-center" d="M 450,180 L 450,270" fill="none" stroke="rgba(255,45,120,0.1)" stroke-width="2" stroke-dasharray="5 5"/>
+      <path id="flow-center-to-bottom" d="M 450,370 L 450,460" fill="none" stroke="rgba(0,255,240,0.1)" stroke-width="2" stroke-dasharray="5 5"/>
+      
+      <!-- 激活状态的流动粒子管道 -->
+      <path id="flow-active-left" d="M 330,120 L 450,320 L 570,520" fill="none" stroke="#00FFF0" stroke-width="3" stroke-dasharray="350" stroke-dashoffset="350" opacity="0"/>
+    </svg>
+
+    <!-- 上方卡片: AI 市场部 -->
+    <div class="hex-card glow-cyan" id="top-card">
+      <div style="font-size:10px;color:rgba(0,255,240,0.5);margin-bottom:6px;font-weight:900;">[ AI 市场部 // CLIENT v1.0 ]</div>
+      <h4 style="font-size:13px;font-weight:900;margin-bottom:8px;color:#fff;">📢 AI 市场部</h4>
+      <div class="terminal-box" id="top-terminal">
+        > 初始化市场模型...<br>
+        > 准备拉取对标文案...
+      </div>
+    </div>
+
+    <!-- 中部 ACI 大脑核心 -->
+    <div class="center-ring-wrap" id="center-brain">
+      <div class="dashed-ring" id="dashed-ring"></div>
+      <div class="aci-diamond" id="aci-diamond">
+        <div class="aci-diamond-text">ACI</div>
+      </div>
+    </div>
+
+    <!-- 下方卡片: AI 运营/研发部 -->
+    <div class="hex-card glow-magenta" id="bottom-card">
+      <div style="font-size:10px;color:rgba(255,45,120,0.5);margin-bottom:6px;font-weight:900;">[ AI 核心支撑 // OPERATIONS ]</div>
+      <h4 style="font-size:13px;font-weight:900;margin-bottom:8px;color:#fff;" id="bottom-title">📊 接口参数与执行反馈</h4>
+      
+      <!-- 进度条 1 -->
+      <div style="margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;font-weight:700;">
+          <span id="bar-1-label">LLM Parameter Match</span>
+          <span id="bar-1-pct">0%</span>
+        </div>
+        <div style="height:3px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden;">
+          <div style="height:100%;width:0%;background:#39ff14;" id="bar-1"></div>
+        </div>
+      </div>
+
+      <!-- 进度条 2 -->
+      <div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;font-weight:700;">
+          <span id="bar-2-label">Interface Validation</span>
+          <span id="bar-2-pct">0%</span>
+        </div>
+        <div style="height:3px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden;">
+          <div style="height:100%;width:0%;background:#00b3ff;" id="bar-2"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const scenes = [
+  { id: 1, dur: 13.0, text: "“一个人，零员工，只靠 3 个 AI 工具……今天直接上实操。”" },
+  { id: 2, dur: 19.0, text: "“为什么我们每天忙得像个陀螺……时薪连 20 块不到。”" },
+  { id: 3, dur: 11.0, text: "“一人公司的核心……指挥十个 AI 助手去干一百个人的活。”" },
+  { id: 4, dur: 17.0, text: "“第一，AI 市场部……直接生成符合我们人设的脚本和推文。”" },
+  { id: 5, dur: 16.0, text: "“第二，AI 运营部……3秒自动识别意图，24小时在线顶级客服。”" },
+  { id: 6, dur: 18.5, text: "“第三，AI 研发部……不仅帮你把代码写好，还能把测试跑通。”" },
+  { id: 7, dur: 15.0, text: "“整个链路跑通之后……剩下的全部由 AI 闭环执行。”" },
+  { id: 8, dur: 10.0, text: "“我们来算一笔账……关注我，回复‘一人公司’，一起开启超级个体之路。”" }
+];
+
+let mainTl = null;
+let cvs, ctx;
+let activeScene = 1;
+const particles = [];
+
+function initCanvas() {
+  cvs = document.getElementById('main-canvas');
+  ctx = cvs.getContext('2d');
+  cvs.width = window.innerWidth;
+  cvs.height = window.innerHeight;
+
+  // 初始化粒子
+  for (let i = 0; i < 40; i++) {
+    particles.push({
+      x: Math.random() * cvs.width,
+      y: Math.random() * cvs.height,
+      vx: Math.random() * 0.4 - 0.2,
+      vy: Math.random() * 0.4 - 0.2,
+      r: Math.random() * 2 + 1
+    });
+  }
+
+  function loop() {
+    ctx.fillStyle = 'rgba(8, 11, 20, 0.1)';
+    ctx.fillRect(0, 0, cvs.width, cvs.height);
+    
+    // 漫反射星空
+    ctx.fillStyle = 'rgba(0, 255, 240, 0.2)';
+    ctx.strokeStyle = 'rgba(0, 255, 240, 0.05)';
+    particles.forEach(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      if (p.x < 0 || p.x > cvs.width) p.vx *= -1;
+      if (p.y < 0 || p.y > cvs.height) p.vy *= -1;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Scene 7 激活高能连线
+    if (activeScene === 7) {
+      ctx.strokeStyle = 'rgba(0, 255, 240, 0.15)';
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const dist = Math.hypot(particles[i].x - particles[j].x, particles[i].y - particles[j].y);
+          if (dist < 120) {
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.stroke();
+          }
+        }
+      }
+    }
+
+    requestAnimationFrame(loop);
+  }
+  loop();
+}
+
+function buildDirectorTimeline() {
+  const hud = document.getElementById('hud');
+  const hudContent = document.getElementById('hud-content');
+  const hudToggle = document.getElementById('hud-toggle');
+  let isHudVisible = true;
+  hud.querySelector('#hud-label').addEventListener('click', () => {
+    isHudVisible = !isHudVisible;
+    hudContent.style.display = isHudVisible ? 'block' : 'none';
+    hudToggle.innerText = isHudVisible ? '▲' : '▼';
+  });
+
+  mainTl = gsap.timeline();
+  scenes.forEach((sc, i) => {
+    mainTl.call(() => {
+      activeScene = sc.id;
+      document.getElementById('scene-num').innerText = sc.id;
+      document.getElementById('hud-text').innerText = sc.text;
+      playSceneAnimation(sc.id, sc.dur);
+    }, null, i === 0 ? 0 : "+=" + scenes[i-1].dur);
+  });
+}
+
+function playSceneAnimation(num, dur) {
+  // 自转动画重置
+  gsap.killTweensOf('#dashed-ring');
+  gsap.to('#dashed-ring', { rotation: num === 3 ? 720 : 360, duration: num === 3 ? 5 : 20, repeat: -1, ease: 'none' });
+
+  if (num === 1) {
+    // 序幕：钻石淡入
+    gsap.set('#visual-board', { scale: 1 });
+    gsap.fromTo('#aci-diamond', { scale: 0.1, opacity: 0 }, { scale: 1, opacity: 1, duration: 1.0, ease: 'back.out(1.8)' });
+    gsap.to('#top-card', { opacity: 0, duration: 0.5 });
+    gsap.to('#bottom-card', { opacity: 0, duration: 0.5 });
+  } 
+  else if (num === 2) {
+    // 陷阱：左右两张卡片极其细小弹入
+    gsap.set('#top-card', { y: 200, scale: 0.5 });
+    gsap.set('#bottom-card', { y: -200, scale: 0.5 });
+    gsap.to(['#top-card', '#bottom-card'], { opacity: 0.4, duration: 1.0, ease: 'power2.out' });
+    
+    // 微弱颤动
+    gsap.to('#top-card', { y: '+=6', repeat: -1, yoyo: true, duration: 0.8, ease: 'sine.inOut' });
+    gsap.to('#bottom-card', { y: '-=6', repeat: -1, yoyo: true, duration: 0.8, ease: 'sine.inOut', delay: 0.3 });
+  } 
+  else if (num === 3) {
+    // 觉醒：推开乱象，钻石猛增 1.4
+    gsap.killTweensOf('#top-card');
+    gsap.killTweensOf('#bottom-card');
+    gsap.to(['#top-card', '#bottom-card'], { opacity: 0, duration: 0.5 });
+    gsap.to('#aci-diamond', { scale: 1.4, duration: 0.6, ease: 'back.out(1.6)' });
+  } 
+  else if (num === 4) {
+    // 市场部砸入
+    gsap.set('#top-card', { y: -200, scale: 1 });
+    gsap.to('#top-card', { opacity: 1, y: 0, duration: 1.0, ease: 'cubic-bezier(0.16, 1, 0.3, 1)' });
+    
+    // 噼里啪啦打字
+    const term = document.getElementById('top-terminal');
+    term.innerHTML = "";
+    const logs = [
+      "> 正在匹配 YouTube 对标...",
+      "> [OK] 抓取完成: 视频 ID w7slWn...",
+      "> [GEN] 正在全自动洗稿二创...",
+      "> [DONE] 赛博朋克风口播脚本就绪"
+    ];
+    let l = 0;
+    const typing = setInterval(() => {
+      if (l < logs.length) {
+        term.innerHTML += logs[l] + "<br>";
+        l++;
+      } else {
+        clearInterval(typing);
+      }
+    }, 400);
+  } 
+  else if (num === 5) {
+    // 运营部激活
+    gsap.set('#bottom-card', { y: 200, scale: 1 });
+    gsap.to('#bottom-card', { opacity: 1, y: 0, duration: 1.0, ease: 'power3.out' });
+    document.getElementById('bottom-title').innerText = "⚙️ AI 运营部";
+    document.getElementById('bar-1-label').innerText = "客服 3s 响应率";
+    
+    // 进度条 1 充能到 99%
+    const progress = { val: 0 };
+    gsap.to(progress, { val: 99, duration: 2.2, ease: 'power2.out', onUpdate: () => {
+      document.getElementById('bar-1-pct').innerText = Math.floor(progress.val) + "%";
+      document.getElementById('bar-1').style.width = progress.val + "%";
+    }});
+  } 
+  else if (num === 6) {
+    // 研发部激活
+    document.getElementById('bottom-title').innerText = "🧪 AI 研发部";
+    document.getElementById('bar-2-label').innerText = "自动化测试覆盖率";
+    
+    // 进度条 2 充能到 95%
+    const progress = { val: 0 };
+    gsap.to(progress, { val: 95, duration: 2.0, ease: 'power2.out', onUpdate: () => {
+      document.getElementById('bar-2-pct').innerText = Math.floor(progress.val) + "%";
+      document.getElementById('bar-2').style.width = progress.val + "%";
+    }});
+  } 
+  else if (num === 7) {
+    // 闭环流动连线
+    gsap.set('#flow-active-left', { strokeDashoffset: 350, opacity: 1 });
+    gsap.to('#flow-active-left', { strokeDashoffset: 0, duration: 1.8, repeat: -1, ease: 'none' });
+    
+    // 神经网络脉冲发光
+    gsap.to(['#top-card', '#bottom-card', '#aci-diamond'], { boxShadow: '0 0 25px rgba(0, 255, 240, 0.8)', duration: 0.6, repeat: -1, yoyo: true });
+  } 
+  else if (num === 8) {
+    // 收尾留白
+    gsap.killTweensOf(['#top-card', '#bottom-card', '#aci-diamond']);
+    gsap.set('#flow-active-left', { opacity: 0 });
+    gsap.to('#visual-board', { scale: 0.9, duration: 0.8, ease: 'power2.out' });
+  }
+}
+
+window.addEventListener('message', (e) => {
+  if (!e.data || !mainTl) return;
+  const { type, speed } = e.data;
+  if (type === 'togglePlay') mainTl.paused() ? mainTl.play() : mainTl.pause();
+  if (type === 'restart') mainTl.restart();
+  if (type === 'setSpeed') mainTl.timeScale(speed);
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  initCanvas();
+  buildDirectorTimeline();
+});
+</script>
+</body>
+</html>

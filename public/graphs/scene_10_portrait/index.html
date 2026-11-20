@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>竖屏分镜 10</title>
+  <style>
+    :root {
+      --bg: #060913;
+      --green: #39ff14;
+      --red: #ff3b3b;
+      --cyan: #00fff0;
+      --magenta: #ff2d78;
+      --blue: #00b3ff;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg);
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Courier New', Courier, monospace;
+      color: #ffffff;
+    }
+    #stage {
+      position: relative;
+      width: 640px;
+      height: 1138px;
+      background: #060913;
+      border: 2px solid #1a233d;
+      box-shadow: 0 0 20px rgba(0, 243, 255, 0.1);
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+    .cyber-card {
+      position: absolute;
+      border: 2px solid var(--border-color, #1a233d);
+      background: rgba(6, 9, 19, 0.95);
+      padding: 15px;
+      box-sizing: border-box;
+      box-shadow: 0 0 15px var(--glow-color, rgba(0, 243, 255, 0.15));
+      border-radius: 4px;
+    }
+    .font-mono {
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+    }
+  </style>
+  <script type="text/javascript" src="js/gsap.min.js"></script>
+</head>
+<body>
+  <div id="stage" data-composition-id="root" data-start="0" data-duration="6" data-width="640" data-height="1138">
+    
+      <div id="warn-win" class="cyber-card" style="left: 50px; top: 220px; width: 540px; height: 500px; --border-color: var(--red); --glow-color: rgba(255,59,59,0.3); text-align: center; padding: 40px 20px;">
+        <div class="font-mono" style="font-size: 36px; color: var(--red); text-shadow: 0 0 10px var(--red); font-weight: bold; letter-spacing: 2px;">⚠️ RISK DETECTED</div>
+        <div style="font-size: 80px; margin-top: 50px; letter-spacing: 20px;">🛡️➜🦠➜🔒</div>
+        <div class="font-mono" style="font-size: 18px; color: #ff8888; margin-top: 50px; line-height: 1.8;">第一起完全由AI智能体发起漏洞利用、文件加密并自动化勒索的攻击已经发生。</div>
+      </div>
+      <div id="subtitle" style="position: absolute; bottom: 80px; left: 50px; right: 50px; text-align: center; font-size: 28px; color: #fff; line-height: 1.6;">AI智能体完全自主发起勒索软件攻击，这把刀是双刃的。</div>
+
+  </div>
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tl = gsap.timeline({ paused: true });
+    
+    
+    tl.fromTo("#warn-win", {scale: 1.1, opacity: 0}, {scale: 1, opacity: 1, duration: 0.4, ease: "power4.out"}, 0.2);
+    tl.to("#warn-win", {borderColor: "#ff0000", boxShadow: "0 0 35px rgba(255, 0, 0, 0.6)", duration: 0.2, repeat: 5, yoyo: true}, 0.6);
+    tl.fromTo("#subtitle", {opacity: 0}, {opacity: 1, duration: 0.5}, 0.2);
+
+    
+    window.__timelines["root"] = tl;
+    
+    window.addEventListener('message', (e) => {
+      if (!e.data) return;
+      if (e.data.type === 'togglePlay') {
+        if (tl.paused()) tl.play(); else tl.pause();
+      } else if (e.data.type === 'restart') {
+        tl.restart();
+      } else if (e.data.type === 'setSpeed') {
+        tl.timeScale(e.data.speed);
+      }
+    });
+  </script>
+</body>
+</html>

@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# vue3-project: videos are backed up outside git (local + R2), not tracked
+public/videos/
+*.bak
